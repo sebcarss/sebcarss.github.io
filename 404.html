@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page not found · Seb Carss</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="/">Seb Carss</a>
+        <nav class="nav-links">
+          <a href="/">Home</a>
+          <a href="/music/">Music</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="notfound">
+        <h1>404</h1>
+        <p>That page doesn't exist.</p>
+        <p><a href="/">← Back home</a></p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>© <span id="year">2026</span> Seb Carss</span>
+        <a href="https://github.com/sebcarss">GitHub</a>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>

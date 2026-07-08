@@ -1,0 +1,28 @@
+# sebcarss.github.io
+
+Personal homepage and small utilities, served from
+[sebcarss.github.io](https://sebcarss.github.io).
+
+Plain static HTML/CSS — no build step. Push to `master` and GitHub Pages serves
+the tree as-is (`.nojekyll`).
+
+## Structure
+
+```
+index.html                    Homepage
+styles.css                    Shared styles
+404.html                      Not-found page
+music/index.html              Music category page
+music/tab-caster/index.html   Tab Caster utility (self-contained)
+```
+
+## Utilities
+
+- **[Tab Caster](https://sebcarss.github.io/music/tab-caster)** — turn an
+  Ultimate Guitar PDF into a single-screen tab you can cast to a TV.
+
+## Adding a new utility
+
+1. Drop the self-contained app at `<category>/<name>/index.html`.
+2. Add a `.card` link on `index.html` (and the category page).
+3. If it's a new category, add a nav link and, optionally, a `<category>/index.html`.
