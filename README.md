@@ -15,6 +15,7 @@ styles.css                    Shared styles
 music/index.html              Music category page
 music/tab-caster/index.html   Tab Caster utility (self-contained)
 food/index.html               Food category page
+food/ice-cream-calculator/index.html   Ice Cream Calculator utility (self-contained)
 ```
 
 ## Utilities
@@ -24,6 +25,9 @@ food/index.html               Food category page
 
 ## Food
 
+- **[Ice Cream Calculator](https://sebcarss.github.io/food/ice-cream-calculator)** —
+  balance fat, sugar and MSNF (plus POD/PAC) against ice cream and gelato
+  targets to develop new recipes.
 - **[Dreaming of Noodles](https://dreamingofnoodles.com)** — my Japanese food blog.
 
 ## Adding a new utility

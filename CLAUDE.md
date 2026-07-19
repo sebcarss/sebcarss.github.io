@@ -21,6 +21,8 @@ styles.css                    Shared styles for every page (nav, cards, footer)
 404.html                      Not-found page
 music/index.html              "Music" category page
 music/tab-caster/index.html   Tab Caster utility (fully self-contained)
+food/index.html               "Food" category page
+food/ice-cream-calculator/index.html   Ice Cream Calculator utility
 ```
 
 Each category (e.g. `music/`) has its own `index.html` listing the utilities
@@ -65,3 +67,23 @@ Key things to know before touching it:
     column count/zoom that best fills the screen.
 - Everything is plain DOM/canvas JS — no framework, no build step. `$()` is
   a `getElementById` shorthand defined near the top of the app script.
+
+## Ice Cream Calculator (`food/ice-cream-calculator/index.html`)
+
+A single-file recipe balancing tool: pick ingredients and amounts in grams,
+and it computes fat / sugar / MSNF / other solids / total solids percentages
+plus POD (relative sweetness) and PAC (anti-freezing power), compared against
+target ranges for ice cream and gelato. Unlike Tab Caster it reuses
+`/styles.css` and the standard nav/footer, with page-specific styles inline.
+Key things to know:
+
+- **Ingredient data** (`BUILTINS`) is per 100 g of ingredient. `pod`/`pac`
+  cover only the ingredient's own sugars — the lactose inside MSNF is added
+  globally in `compute()` (`LACTOSE_*` constants), so don't add lactose
+  contributions to individual dairy entries or it will be double-counted.
+- **Target ranges** live in `BASELINES` (ice cream vs gelato); metric labels
+  and meter scales in `METRICS`. All figures are approximate published ranges
+  and safe to tune.
+- Custom ingredients and saved recipes persist to localStorage under
+  `icc:ingredients` and `icc:recipes`; recipes reference ingredients by name.
+- Plain DOM JS, no dependencies. `$()` is a `getElementById` shorthand.

@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ice Cream Calculator · Seb Carss</title>
+    <meta
+      name="description"
+      content="Balance fat, sugar and MSNF in ice cream and gelato recipes with live comparison against target ranges, including POD sweetness and PAC anti-freezing power."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .icc-grid {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 1.5rem;
+        align-items: start;
+      }
+
+      @media (max-width: 760px) {
+        .icc-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .icc-panel {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.1rem 1.25rem;
+        background: var(--surface);
+      }
+
+      .icc-panel h2 {
+        margin: 0 0 0.75rem;
+        font-size: 1.1rem;
+      }
+
+      .icc-panel + .icc-panel {
+        margin-top: 1.5rem;
+      }
+
+      /* Style toggle */
+      .icc-toggle {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+      }
+
+      .icc-toggle button {
+        border: 0;
+        background: none;
+        font: inherit;
+        color: var(--muted);
+        padding: 0.4rem 1.1rem;
+        cursor: pointer;
+      }
+
+      .icc-toggle button[aria-pressed="true"] {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* Recipe table */
+      .icc-rows {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      .icc-rows th {
+        text-align: left;
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 0.85rem;
+        padding: 0 0.5rem 0.35rem 0;
+      }
+
+      .icc-rows td {
+        padding: 0.25rem 0.5rem 0.25rem 0;
+        vertical-align: middle;
+      }
+
+      .icc-rows td:last-child,
+      .icc-rows th:last-child {
+        padding-right: 0;
+      }
+
+      .icc-rows select,
+      .icc-rows input[type="number"] {
+        width: 100%;
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.35rem 0.5rem;
+      }
+
+      .icc-rows input[type="number"] {
+        max-width: 6.5rem;
+        text-align: right;
+      }
+
+      .icc-solids {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .icc-remove {
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.25rem;
+      }
+
+      .icc-remove:hover {
+        color: #dc2626;
+      }
+
+      .icc-total-row td {
+        border-top: 1px solid var(--border);
+        padding-top: 0.5rem;
+        font-weight: 600;
+      }
+
+      /* Buttons */
+      .icc-btn {
+        font: inherit;
+        font-size: 0.9rem;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.9rem;
+        cursor: pointer;
+      }
+
+      .icc-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .icc-btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .icc-btn-primary:hover {
+        color: #fff;
+        opacity: 0.9;
+      }
+
+      .icc-actions {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      /* Results */
+      .icc-metric {
+        padding: 0.55rem 0;
+      }
+
+      .icc-metric + .icc-metric {
+        border-top: 1px solid var(--border);
+      }
+
+      .icc-metric-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+      }
+
+      .icc-metric-head .target {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .icc-value {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+
+      .icc-value.low,
+      .icc-value.high {
+        color: #b45309;
+      }
+
+      .icc-value.ok {
+        color: #15803d;
+      }
+
+      .icc-meter {
+        position: relative;
+        height: 8px;
+        margin-top: 0.4rem;
+        border-radius: 4px;
+        background: #f3f4f6;
+        overflow: hidden;
+      }
+
+      .icc-meter .band {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        background: var(--accent-soft);
+        border-left: 1px solid var(--accent);
+        border-right: 1px solid var(--accent);
+      }
+
+      .icc-meter .marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        border-radius: 2px;
+        background: var(--text);
+      }
+
+      .icc-meter .marker.low,
+      .icc-meter .marker.high {
+        background: #b45309;
+      }
+
+      .icc-meter .marker.ok {
+        background: #15803d;
+      }
+
+      .icc-water {
+        margin: 0.75rem 0 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      /* Saved recipes & custom ingredients */
+      .icc-save-form,
+      .icc-ing-form {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: end;
+      }
+
+      .icc-save-form input[type="text"],
+      .icc-ing-form input {
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.6rem;
+      }
+
+      .icc-ing-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .icc-ing-form input[type="number"] {
+        width: 5.5rem;
+        text-align: right;
+      }
+
+      .icc-list {
+        list-style: none;
+        margin: 0.75rem 0 0;
+        padding: 0;
+      }
+
+      .icc-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.4rem 0;
+        border-top: 1px solid var(--border);
+        font-size: 0.95rem;
+      }
+
+      .icc-list .meta {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .icc-list .btns {
+        display: flex;
+        gap: 0.4rem;
+        flex-shrink: 0;
+      }
+
+      .icc-note {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin: 0.5rem 0 0;
+      }
+
+      details.icc-panel summary {
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1.1rem;
+      }
+
+      details.icc-panel[open] summary {
+        margin-bottom: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="/">Seb Carss</a>
+        <nav class="nav-links">
+          <a href="/">Home</a>
+          <a href="/music/">Music</a>
+          <a href="/food/" aria-current="page">Food</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <h1><span aria-hidden="true">🍦</span> Ice Cream Calculator</h1>
+        <p>
+          Build a recipe in grams and balance its fat, sugar and MSNF against
+          ice cream or gelato targets — including POD (sweetness) and PAC
+          (anti-freezing power).
+        </p>
+      </section>
+
+      <div class="icc-toggle" role="group" aria-label="Recipe style">
+        <button type="button" id="style-icecream" aria-pressed="true">Ice cream</button>
+        <button type="button" id="style-gelato" aria-pressed="false">Gelato</button>
+      </div>
+
+      <div class="icc-grid">
+        <div>
+          <section class="icc-panel">
+            <h2>Recipe</h2>
+            <table class="icc-rows">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Grams</th>
+                  <th>Solids</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+              <tfoot>
+                <tr class="icc-total-row">
+                  <td>Total</td>
+                  <td id="total-grams" style="text-align: right"></td>
+                  <td id="total-solids" class="icc-solids"></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+            <div class="icc-actions">
+              <button type="button" class="icc-btn" id="add-row">+ Add ingredient</button>
+              <button type="button" class="icc-btn" id="clear-rows">Clear</button>
+            </div>
+          </section>
+
+          <section class="icc-panel">
+            <h2>Saved recipes</h2>
+            <div class="icc-save-form">
+              <input type="text" id="recipe-name" placeholder="Recipe name" aria-label="Recipe name" />
+              <button type="button" class="icc-btn icc-btn-primary" id="save-recipe">Save</button>
+            </div>
+            <ul class="icc-list" id="recipe-list"></ul>
+            <p class="icc-note">Recipes are saved in this browser only.</p>
+          </section>
+
+          <details class="icc-panel">
+            <summary>Custom ingredients</summary>
+            <form class="icc-ing-form" id="ing-form">
+              <label>Name
+                <input type="text" id="ing-name" required />
+              </label>
+              <label>Fat %
+                <input type="number" id="ing-fat" min="0" max="100" step="0.1" value="0" />
+              </label>
+              <label>Sugar %
+                <input type="number" id="ing-sugar" min="0" max="100" step="0.1" value="0" />
+              </label>
+              <label>MSNF %
+                <input type="number" id="ing-msnf" min="0" max="100" step="0.1" value="0" />
+              </label>
+              <label>Other solids %
+                <input type="number" id="ing-other" min="0" max="100" step="0.1" value="0" />
+              </label>
+              <label>POD
+                <input type="number" id="ing-pod" min="0" step="0.1" placeholder="= sugar" />
+              </label>
+              <label>PAC
+                <input type="number" id="ing-pac" min="0" step="0.1" placeholder="= sugar" />
+              </label>
+              <button type="submit" class="icc-btn icc-btn-primary">Add</button>
+            </form>
+            <p class="icc-note">
+              Percentages are per 100 g of the ingredient. POD/PAC apply to its
+              sugars and default to the sugar figure (i.e. treated like
+              sucrose); override them for other sweeteners.
+            </p>
+            <ul class="icc-list" id="ing-list"></ul>
+          </details>
+        </div>
+
+        <section class="icc-panel">
+          <h2>Composition</h2>
+          <div id="results"></div>
+          <p class="icc-water" id="water-line"></p>
+          <p class="icc-note">
+            Targets are typical published ranges — treat them as a guide, not a
+            rulebook. PAC includes the lactose in MSNF; higher PAC means a
+            softer scoop at a given temperature.
+          </p>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>© <span id="year">2026</span> Seb Carss</span>
+        <a href="https://github.com/sebcarss">GitHub</a>
+      </div>
+    </footer>
+
+    <script>
+      "use strict";
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      const $ = (id) => document.getElementById(id);
+
+      // ---- Data -----------------------------------------------------------
+      // All figures are per 100 g of ingredient. `pod`/`pac` describe the
+      // ingredient's own sugars only; the lactose inside MSNF is added
+      // globally in compute() so it is never double-counted.
+      const BUILTINS = [
+        { name: "Whole milk",          cat: "Dairy",      fat: 3.6,  sugar: 0,   msnf: 8.9, other: 0,  pod: 0,   pac: 0 },
+        { name: "Semi-skimmed milk",   cat: "Dairy",      fat: 1.8,  sugar: 0,   msnf: 9.0, other: 0,  pod: 0,   pac: 0 },
+        { name: "Skimmed milk",        cat: "Dairy",      fat: 0.1,  sugar: 0,   msnf: 9.1, other: 0,  pod: 0,   pac: 0 },
+        { name: "Double cream",        cat: "Dairy",      fat: 48,   sugar: 0,   msnf: 4.6, other: 0,  pod: 0,   pac: 0 },
+        { name: "Whipping cream",      cat: "Dairy",      fat: 36,   sugar: 0,   msnf: 5.6, other: 0,  pod: 0,   pac: 0 },
+        { name: "Skimmed milk powder", cat: "Dairy",      fat: 1,    sugar: 0,   msnf: 96,  other: 0,  pod: 0,   pac: 0 },
+        { name: "Butter",              cat: "Dairy",      fat: 82,   sugar: 0,   msnf: 2,   other: 0,  pod: 0,   pac: 0 },
+        { name: "Condensed milk",      cat: "Dairy",      fat: 8,    sugar: 45,  msnf: 20,  other: 0,  pod: 45,  pac: 45 },
+        { name: "Egg yolk",            cat: "Other",      fat: 27,   sugar: 0,   msnf: 0,   other: 23, pod: 0,   pac: 0 },
+        { name: "Cocoa powder",        cat: "Other",      fat: 22,   sugar: 0,   msnf: 0,   other: 75, pod: 0,   pac: 0 },
+        { name: "Dark chocolate 70%",  cat: "Other",      fat: 42,   sugar: 29,  msnf: 0,   other: 28, pod: 29,  pac: 29 },
+        { name: "Caster sugar",        cat: "Sweeteners", fat: 0,    sugar: 100, msnf: 0,   other: 0,  pod: 100, pac: 100 },
+        { name: "Dextrose",            cat: "Sweeteners", fat: 0,    sugar: 100, msnf: 0,   other: 0,  pod: 70,  pac: 190 },
+        { name: "Glucose syrup",       cat: "Sweeteners", fat: 0,    sugar: 80,  msnf: 0,   other: 0,  pod: 36,  pac: 73 },
+        { name: "Honey",               cat: "Sweeteners", fat: 0,    sugar: 82,  msnf: 0,   other: 0,  pod: 105, pac: 155 },
+        { name: "Golden syrup",        cat: "Sweeteners", fat: 0,    sugar: 80,  msnf: 0,   other: 0,  pod: 88,  pac: 120 },
+      ];
+
+      // Lactose is ~54.5% of MSNF; it sweetens a little and depresses the
+      // freezing point like any sugar.
+      const LACTOSE_FRACTION = 0.545;
+      const LACTOSE_POD = 0.16;
+      const LACTOSE_PAC = 1.0;
+
+      const BASELINES = {
+        icecream: {
+          label: "Ice cream",
+          fat: [10, 20], sugar: [14, 18], msnf: [7, 12],
+          solids: [36, 42], pod: [12, 18], pac: [24, 28],
+        },
+        gelato: {
+          label: "Gelato",
+          fat: [4, 9], sugar: [16, 22], msnf: [8, 12],
+          solids: [32, 40], pod: [16, 22], pac: [27, 31],
+        },
+      };
+
+      // key, label, unit, meter scale maximum
+      const METRICS = [
+        ["fat",    "Fat",          "%", 30],
+        ["sugar",  "Sugar",        "%", 30],
+        ["msnf",   "MSNF",         "%", 18],
+        ["other",  "Other solids", "%", null],
+        ["solids", "Total solids", "%", 55],
+        ["pod",    "POD",          "",  35],
+        ["pac",    "PAC",          "",  45],
+      ];
+
+      const LS_INGREDIENTS = "icc:ingredients";
+      const LS_RECIPES = "icc:recipes";
+
+      // ---- State ----------------------------------------------------------
+      let style = "icecream";
+      let rows = [
+        { ing: "Whole milk", grams: 500 },
+        { ing: "Double cream", grams: 250 },
+        { ing: "Caster sugar", grams: 130 },
+        { ing: "Skimmed milk powder", grams: 40 },
+        { ing: "Egg yolk", grams: 80 },
+      ];
+
+      const loadJSON = (key) => {
+        try {
+          return JSON.parse(localStorage.getItem(key)) || [];
+        } catch {
+          return [];
+        }
+      };
+      const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+      let customIngredients = loadJSON(LS_INGREDIENTS);
+      let recipes = loadJSON(LS_RECIPES);
+
+      const allIngredients = () => BUILTINS.concat(customIngredients);
+      const findIngredient = (name) => allIngredients().find((i) => i.name === name);
+
+      // ---- Maths ----------------------------------------------------------
+      function compute() {
+        const totals = { grams: 0, fat: 0, sugar: 0, msnf: 0, other: 0, pod: 0, pac: 0 };
+        for (const row of rows) {
+          const ing = findIngredient(row.ing);
+          const g = Number(row.grams) || 0;
+          if (!ing || g <= 0) continue;
+          totals.grams += g;
+          totals.fat += (g * ing.fat) / 100;
+          totals.sugar += (g * ing.sugar) / 100;
+          totals.msnf += (g * ing.msnf) / 100;
+          totals.other += (g * (ing.other || 0)) / 100;
+          totals.pod += (g * ing.pod) / 100;
+          totals.pac += (g * ing.pac) / 100;
+        }
+        const lactose = totals.msnf * LACTOSE_FRACTION;
+        totals.pod += lactose * LACTOSE_POD;
+        totals.pac += lactose * LACTOSE_PAC;
+
+        if (!totals.grams) return null;
+        const pct = (x) => (x / totals.grams) * 100;
+        return {
+          grams: totals.grams,
+          solidGrams: totals.fat + totals.sugar + totals.msnf + totals.other,
+          fat: pct(totals.fat),
+          sugar: pct(totals.sugar),
+          msnf: pct(totals.msnf),
+          other: pct(totals.other),
+          solids: pct(totals.fat + totals.sugar + totals.msnf + totals.other),
+          pod: pct(totals.pod),
+          pac: pct(totals.pac),
+        };
+      }
+
+      function rowSolids(row) {
+        const ing = findIngredient(row.ing);
+        const g = Number(row.grams) || 0;
+        if (!ing || g <= 0) return 0;
+        return (g * (ing.fat + ing.sugar + ing.msnf + (ing.other || 0))) / 100;
+      }
+
+      // ---- Recipe table ---------------------------------------------------
+      function buildSelect(selected) {
+        const sel = document.createElement("select");
+        const groups = [["Dairy"], ["Sweeteners"], ["Other"]];
+        for (const [cat] of groups) {
+          const og = document.createElement("optgroup");
+          og.label = cat;
+          for (const ing of BUILTINS.filter((i) => i.cat === cat)) {
+            og.appendChild(new Option(ing.name, ing.name, false, ing.name === selected));
+          }
+          sel.appendChild(og);
+        }
+        if (customIngredients.length) {
+          const og = document.createElement("optgroup");
+          og.label = "Your ingredients";
+          for (const ing of customIngredients) {
+            og.appendChild(new Option(ing.name, ing.name, false, ing.name === selected));
+          }
+          sel.appendChild(og);
+        }
+        return sel;
+      }
+
+      function renderRows() {
+        const tbody = $("rows");
+        tbody.textContent = "";
+        rows.forEach((row, idx) => {
+          const tr = document.createElement("tr");
+
+          const tdIng = document.createElement("td");
+          const sel = buildSelect(row.ing);
+          sel.setAttribute("aria-label", "Ingredient");
+          sel.addEventListener("change", () => {
+            row.ing = sel.value;
+            update();
+          });
+          tdIng.appendChild(sel);
+
+          const tdG = document.createElement("td");
+          const input = document.createElement("input");
+          input.type = "number";
+          input.min = "0";
+          input.step = "1";
+          input.value = row.grams;
+          input.setAttribute("aria-label", "Grams");
+          input.addEventListener("input", () => {
+            row.grams = input.value;
+            update(true);
+          });
+          tdG.appendChild(input);
+
+          const tdS = document.createElement("td");
+          tdS.className = "icc-solids";
+
+          const tdX = document.createElement("td");
+          const x = document.createElement("button");
+          x.type = "button";
+          x.className = "icc-remove";
+          x.textContent = "✕";
+          x.setAttribute("aria-label", "Remove " + row.ing);
+          x.addEventListener("click", () => {
+            rows.splice(idx, 1);
+            update();
+          });
+          tdX.appendChild(x);
+
+          tr.append(tdIng, tdG, tdS, tdX);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderRowSolids() {
+        const cells = $("rows").querySelectorAll(".icc-solids");
+        rows.forEach((row, idx) => {
+          const s = rowSolids(row);
+          cells[idx].textContent = s ? s.toFixed(0) + " g" : "–";
+        });
+      }
+
+      // ---- Results --------------------------------------------------------
+      function renderResults() {
+        const res = compute();
+        const base = BASELINES[style];
+        const out = $("results");
+        out.textContent = "";
+
+        $("total-grams").textContent = res ? res.grams.toFixed(0) + " g" : "–";
+        $("total-solids").textContent = res ? res.solidGrams.toFixed(0) + " g" : "–";
+        $("water-line").textContent = res
+          ? "Water: " + (100 - res.solids).toFixed(1) + "% of the mix."
+          : "";
+
+        for (const [key, label, unit, scaleMax] of METRICS) {
+          const div = document.createElement("div");
+          div.className = "icc-metric";
+
+          const range = base[key];
+          const value = res ? res[key] : null;
+          let status = "";
+          if (range && value != null) {
+            status = value < range[0] ? "low" : value > range[1] ? "high" : "ok";
+          }
+
+          const head = document.createElement("div");
+          head.className = "icc-metric-head";
+          const name = document.createElement("span");
+          name.textContent = label;
+          const target = document.createElement("span");
+          target.className = "target";
+          target.textContent = range ? "target " + range[0] + "–" + range[1] + unit : "";
+          const val = document.createElement("span");
+          val.className = "icc-value " + status;
+          val.textContent = value == null ? "–" : value.toFixed(1) + unit;
+          head.append(name, target, val);
+          div.appendChild(head);
+
+          if (range && scaleMax) {
+            const meter = document.createElement("div");
+            meter.className = "icc-meter";
+            const band = document.createElement("div");
+            band.className = "band";
+            band.style.left = (range[0] / scaleMax) * 100 + "%";
+            band.style.width = ((range[1] - range[0]) / scaleMax) * 100 + "%";
+            meter.appendChild(band);
+            if (value != null) {
+              const marker = document.createElement("div");
+              marker.className = "marker " + status;
+              marker.style.left = Math.min((value / scaleMax) * 100, 99) + "%";
+              meter.appendChild(marker);
+            }
+            meter.title = label + " target " + range[0] + "–" + range[1] + unit;
+            div.appendChild(meter);
+          }
+          out.appendChild(div);
+        }
+      }
+
+      function update(skipRowRebuild) {
+        if (!skipRowRebuild) renderRows();
+        renderRowSolids();
+        renderResults();
+      }
+
+      // ---- Style toggle ---------------------------------------------------
+      function setStyle(s) {
+        style = s;
+        $("style-icecream").setAttribute("aria-pressed", String(s === "icecream"));
+        $("style-gelato").setAttribute("aria-pressed", String(s === "gelato"));
+        renderResults();
+      }
+      $("style-icecream").addEventListener("click", () => setStyle("icecream"));
+      $("style-gelato").addEventListener("click", () => setStyle("gelato"));
+
+      // ---- Recipe actions -------------------------------------------------
+      $("add-row").addEventListener("click", () => {
+        rows.push({ ing: BUILTINS[0].name, grams: "" });
+        update();
+        const inputs = $("rows").querySelectorAll("input");
+        inputs[inputs.length - 1].focus();
+      });
+
+      $("clear-rows").addEventListener("click", () => {
+        rows = [{ ing: BUILTINS[0].name, grams: "" }];
+        update();
+      });
+
+      // ---- Saved recipes --------------------------------------------------
+      function renderRecipes() {
+        const ul = $("recipe-list");
+        ul.textContent = "";
+        for (const r of recipes) {
+          const li = document.createElement("li");
+          const info = document.createElement("span");
+          info.textContent = r.name + " ";
+          const meta = document.createElement("span");
+          meta.className = "meta";
+          meta.textContent =
+            BASELINES[r.style].label + " · " + r.rows.length + " ingredients";
+          info.appendChild(meta);
+
+          const btns = document.createElement("span");
+          btns.className = "btns";
+          const load = document.createElement("button");
+          load.type = "button";
+          load.className = "icc-btn";
+          load.textContent = "Load";
+          load.addEventListener("click", () => {
+            const missing = r.rows.filter((row) => !findIngredient(row.ing));
+            if (missing.length) {
+              alert(
+                "Skipping unknown ingredients: " +
+                  missing.map((m) => m.ing).join(", ")
+              );
+            }
+            rows = r.rows
+              .filter((row) => findIngredient(row.ing))
+              .map((row) => ({ ing: row.ing, grams: row.grams }));
+            $("recipe-name").value = r.name;
+            setStyle(r.style);
+            update();
+          });
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "icc-btn";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => {
+            if (!confirm('Delete recipe "' + r.name + '"?')) return;
+            recipes = recipes.filter((x) => x !== r);
+            saveJSON(LS_RECIPES, recipes);
+            renderRecipes();
+          });
+          btns.append(load, del);
+          li.append(info, btns);
+          ul.appendChild(li);
+        }
+      }
+
+      $("save-recipe").addEventListener("click", () => {
+        const name = $("recipe-name").value.trim();
+        if (!name) {
+          $("recipe-name").focus();
+          return;
+        }
+        const entry = {
+          name,
+          style,
+          rows: rows
+            .filter((r) => Number(r.grams) > 0)
+            .map((r) => ({ ing: r.ing, grams: Number(r.grams) })),
+        };
+        const existing = recipes.findIndex((r) => r.name === name);
+        if (existing >= 0) recipes[existing] = entry;
+        else recipes.push(entry);
+        saveJSON(LS_RECIPES, recipes);
+        renderRecipes();
+      });
+
+      // ---- Custom ingredients ---------------------------------------------
+      function renderIngredients() {
+        const ul = $("ing-list");
+        ul.textContent = "";
+        for (const ing of customIngredients) {
+          const li = document.createElement("li");
+          const info = document.createElement("span");
+          info.textContent = ing.name + " ";
+          const meta = document.createElement("span");
+          meta.className = "meta";
+          meta.textContent =
+            "fat " + ing.fat + "% · sugar " + ing.sugar + "% · MSNF " +
+            ing.msnf + "% · other " + (ing.other || 0) + "%";
+          info.appendChild(meta);
+
+          const btns = document.createElement("span");
+          btns.className = "btns";
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "icc-btn";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => {
+            if (!confirm('Delete ingredient "' + ing.name + '"?')) return;
+            customIngredients = customIngredients.filter((x) => x !== ing);
+            saveJSON(LS_INGREDIENTS, customIngredients);
+            rows = rows.filter((r) => r.ing !== ing.name);
+            if (!rows.length) rows = [{ ing: BUILTINS[0].name, grams: "" }];
+            renderIngredients();
+            update();
+          });
+          btns.append(del);
+          li.append(info, btns);
+          ul.appendChild(li);
+        }
+      }
+
+      $("ing-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = $("ing-name").value.trim();
+        if (!name) return;
+        if (findIngredient(name)) {
+          alert('An ingredient called "' + name + '" already exists.');
+          return;
+        }
+        const num = (id) => Number($(id).value) || 0;
+        const sugar = num("ing-sugar");
+        const ing = {
+          name,
+          cat: "Custom",
+          fat: num("ing-fat"),
+          sugar,
+          msnf: num("ing-msnf"),
+          other: num("ing-other"),
+          pod: $("ing-pod").value === "" ? sugar : num("ing-pod"),
+          pac: $("ing-pac").value === "" ? sugar : num("ing-pac"),
+        };
+        customIngredients.push(ing);
+        saveJSON(LS_INGREDIENTS, customIngredients);
+        e.target.reset();
+        renderIngredients();
+        update();
+      });
+
+      // ---- Init -----------------------------------------------------------
+      renderIngredients();
+      renderRecipes();
+      update();
+    </script>
+  </body>
+</html>
