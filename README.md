@@ -16,6 +16,7 @@ music/index.html              Music category page
 music/tab-caster/index.html   Tab Caster utility (self-contained)
 food/index.html               Food category page
 food/ice-cream-calculator/index.html   Ice Cream Calculator utility (self-contained)
+food/bakers-percentage/index.html      Baker's Percentage Calculator utility (self-contained)
 ```
 
 ## Utilities
@@ -28,6 +29,9 @@ food/ice-cream-calculator/index.html   Ice Cream Calculator utility (self-contai
 - **[Ice Cream Calculator](https://sebcarss.github.io/food/ice-cream-calculator)** —
   balance fat, sugar and MSNF (plus POD/PAC) against ice cream and gelato
   targets to develop new recipes.
+- **[Baker's Percentage Calculator](https://sebcarss.github.io/food/bakers-percentage)** —
+  bread doughs in baker's percentages, with hydration/salt/yeast guidance and
+  poolish, biga and levain preferments.
 - **[Dreaming of Noodles](https://dreamingofnoodles.com)** — my Japanese food blog.
 
 ## Adding a new utility

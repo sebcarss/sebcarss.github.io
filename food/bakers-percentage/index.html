@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Baker's Percentage Calculator · Seb Carss</title>
+    <meta
+      name="description"
+      content="Baker's percentage calculator for bread: tweak flour, water, salt and yeast, scale to loaves, and build poolish, biga or levain preferments with hydration guidance."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+
+      .bpc-grid {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 1.5rem;
+        align-items: start;
+      }
+
+      @media (max-width: 760px) {
+        .bpc-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .bpc-panel {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.1rem 1.25rem;
+        background: var(--surface);
+      }
+
+      .bpc-panel h2 {
+        margin: 0 0 0.75rem;
+        font-size: 1.1rem;
+      }
+
+      .bpc-panel h3 {
+        margin: 1.1rem 0 0.35rem;
+        font-size: 0.95rem;
+      }
+
+      .bpc-panel + .bpc-panel {
+        margin-top: 1.5rem;
+      }
+
+      /* Mode toggle */
+      .bpc-toggle {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 0.85rem;
+      }
+
+      .bpc-toggle button {
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: 0.9rem;
+        color: var(--muted);
+        padding: 0.35rem 1rem;
+        cursor: pointer;
+      }
+
+      .bpc-toggle button[aria-pressed="true"] {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* Tables of rows */
+      .bpc-rows {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      .bpc-rows th {
+        text-align: left;
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 0.85rem;
+        padding: 0 0.5rem 0.35rem 0;
+      }
+
+      .bpc-rows td {
+        padding: 0.25rem 0.5rem 0.25rem 0;
+        vertical-align: middle;
+      }
+
+      .bpc-rows td:last-child,
+      .bpc-rows th:last-child {
+        padding-right: 0;
+      }
+
+      .bpc-rows input[type="text"],
+      .bpc-rows input[type="number"],
+      .bpc-mode-inputs input {
+        width: 100%;
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.35rem 0.5rem;
+      }
+
+      .bpc-rows input[type="number"],
+      .bpc-mode-inputs input {
+        max-width: 6rem;
+        text-align: right;
+      }
+
+      .bpc-rows input:disabled,
+      .bpc-rows input[readonly] {
+        background: #f9fafb;
+        color: var(--muted);
+      }
+
+      .bpc-mode-inputs {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: end;
+        margin-bottom: 1rem;
+      }
+
+      .bpc-mode-inputs label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .bpc-grams {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .bpc-remove {
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.25rem;
+      }
+
+      .bpc-remove:hover {
+        color: #dc2626;
+      }
+
+      .bpc-total-row td {
+        border-top: 1px solid var(--border);
+        padding-top: 0.5rem;
+        font-weight: 600;
+      }
+
+      .bpc-btn {
+        font: inherit;
+        font-size: 0.9rem;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.9rem;
+        cursor: pointer;
+      }
+
+      .bpc-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .bpc-btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .bpc-btn-primary:hover {
+        color: #fff;
+        opacity: 0.9;
+      }
+
+      .bpc-actions {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .bpc-warn {
+        color: #b45309;
+        font-size: 0.85rem;
+        margin: 0.5rem 0 0;
+      }
+
+      .bpc-note {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin: 0.5rem 0 0;
+      }
+
+      /* Guidance meters */
+      .bpc-metric {
+        padding: 0.55rem 0;
+      }
+
+      .bpc-metric + .bpc-metric {
+        border-top: 1px solid var(--border);
+      }
+
+      .bpc-metric-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+      }
+
+      .bpc-value {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+
+      .bpc-value.ok {
+        color: #15803d;
+      }
+
+      .bpc-value.off {
+        color: #b45309;
+      }
+
+      .bpc-meter {
+        position: relative;
+        height: 10px;
+        margin-top: 0.4rem;
+        border-radius: 5px;
+        background: #f3f4f6;
+        overflow: hidden;
+      }
+
+      .bpc-meter .band {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        background: var(--accent-soft);
+      }
+
+      .bpc-meter .band.alt {
+        background: #dbeafe;
+      }
+
+      .bpc-meter .band.target {
+        border-left: 1px solid var(--accent);
+        border-right: 1px solid var(--accent);
+      }
+
+      .bpc-meter .marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        border-radius: 2px;
+        background: var(--text);
+      }
+
+      .bpc-scale {
+        position: relative;
+        height: 1rem;
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+
+      .bpc-scale span {
+        position: absolute;
+        transform: translateX(-50%);
+      }
+
+      .bpc-verdict {
+        font-size: 0.9rem;
+        margin: 0.35rem 0 0;
+      }
+
+      .bpc-guide-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+
+      .bpc-guide-table td {
+        padding: 0.2rem 0.5rem 0.2rem 0;
+        vertical-align: top;
+      }
+
+      .bpc-guide-table td:first-child {
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      /* Preferment split */
+      .bpc-split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 0.75rem;
+      }
+
+      @media (max-width: 560px) {
+        .bpc-split {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .bpc-split table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+
+      .bpc-split caption {
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding-bottom: 0.3rem;
+      }
+
+      .bpc-split td {
+        padding: 0.15rem 0;
+      }
+
+      .bpc-split td:last-child {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .bpc-split .total td {
+        border-top: 1px solid var(--border);
+        padding-top: 0.3rem;
+        font-weight: 600;
+      }
+
+      .bpc-pref-params {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: end;
+        margin-top: 0.75rem;
+      }
+
+      .bpc-pref-params label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .bpc-pref-params input,
+      .bpc-pref-params select {
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.35rem 0.5rem;
+      }
+
+      .bpc-pref-params input {
+        width: 5.5rem;
+        text-align: right;
+      }
+
+      /* Saved recipes list */
+      .bpc-save-form {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .bpc-save-form input[type="text"] {
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.6rem;
+      }
+
+      .bpc-list {
+        list-style: none;
+        margin: 0.75rem 0 0;
+        padding: 0;
+      }
+
+      .bpc-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.4rem 0;
+        border-top: 1px solid var(--border);
+        font-size: 0.95rem;
+      }
+
+      .bpc-list .meta {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .bpc-list .btns {
+        display: flex;
+        gap: 0.4rem;
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="/">Seb Carss</a>
+        <nav class="nav-links">
+          <a href="/">Home</a>
+          <a href="/music/">Music</a>
+          <a href="/food/" aria-current="page">Food</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <h1><span aria-hidden="true">🥖</span> Baker's Percentage Calculator</h1>
+        <p>
+          Flour is 100% — everything else is a percentage of it. Tweak
+          hydration, salt and yeast, scale to your loaves, and split the dough
+          into a poolish, biga or levain.
+        </p>
+      </section>
+
+      <div class="bpc-grid">
+        <div>
+          <section class="bpc-panel">
+            <h2>Recipe</h2>
+
+            <div class="bpc-toggle" role="group" aria-label="Scaling mode">
+              <button type="button" id="mode-flour" aria-pressed="true">Flour weight</button>
+              <button type="button" id="mode-target" aria-pressed="false">Target dough</button>
+            </div>
+
+            <div class="bpc-mode-inputs" id="flour-inputs">
+              <label>Flour g
+                <input type="number" id="flour-grams" min="0" step="10" value="500" />
+              </label>
+            </div>
+            <div class="bpc-mode-inputs" id="target-inputs" hidden>
+              <label>Loaves
+                <input type="number" id="loaves" min="1" step="1" value="2" />
+              </label>
+              <label>Dough g per loaf
+                <input type="number" id="loaf-weight" min="0" step="10" value="800" />
+              </label>
+              <span class="bpc-note" id="target-flour-note"></span>
+            </div>
+
+            <h3>Flour blend <span class="bpc-note" style="font-weight: 400">(shares of the 100%)</span></h3>
+            <table class="bpc-rows">
+              <thead>
+                <tr>
+                  <th>Flour</th>
+                  <th>Share %</th>
+                  <th>Grams</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="flour-rows"></tbody>
+            </table>
+            <div class="bpc-actions">
+              <button type="button" class="bpc-btn" id="add-flour">+ Add flour</button>
+            </div>
+            <p class="bpc-warn" id="blend-warn" hidden></p>
+
+            <h3>Ingredients</h3>
+            <table class="bpc-rows">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Baker's %</th>
+                  <th>Grams</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Water</td>
+                  <td><input type="number" id="water-pct" min="0" step="1" value="70" aria-label="Water percent" /></td>
+                  <td><input type="number" id="water-g" min="0" step="5" aria-label="Water grams" /></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td>Salt</td>
+                  <td><input type="number" id="salt-pct" min="0" step="0.1" value="2" aria-label="Salt percent" /></td>
+                  <td><input type="number" id="salt-g" min="0" step="0.5" aria-label="Salt grams" /></td>
+                  <td></td>
+                </tr>
+                <tr id="yeast-row">
+                  <td>Yeast (instant)</td>
+                  <td><input type="number" id="yeast-pct" min="0" step="0.1" value="1" aria-label="Yeast percent" /></td>
+                  <td><input type="number" id="yeast-g" min="0" step="0.1" aria-label="Yeast grams" /></td>
+                  <td></td>
+                </tr>
+              </tbody>
+              <tbody id="extra-rows"></tbody>
+              <tfoot>
+                <tr class="bpc-total-row">
+                  <td>Total dough</td>
+                  <td id="total-pct" class="bpc-grams"></td>
+                  <td id="total-g"></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+            <div class="bpc-actions">
+              <button type="button" class="bpc-btn" id="add-extra">+ Add extra (oil, seeds…)</button>
+            </div>
+            <datalist id="extra-suggestions">
+              <option value="Olive oil"></option>
+              <option value="Sugar"></option>
+              <option value="Honey"></option>
+              <option value="Butter"></option>
+              <option value="Milk"></option>
+              <option value="Mixed seeds"></option>
+            </datalist>
+            <p class="bpc-note" id="levain-note" hidden>
+              Leavening comes from the levain — the commercial yeast row is off.
+            </p>
+            <p class="bpc-note" id="per-loaf-note" hidden></p>
+          </section>
+
+          <section class="bpc-panel">
+            <h2>Preferment</h2>
+            <div class="bpc-pref-params">
+              <label>Type
+                <select id="pref-type">
+                  <option value="none">None (straight dough)</option>
+                  <option value="poolish">Poolish</option>
+                  <option value="biga">Biga</option>
+                  <option value="levain">Sourdough levain</option>
+                </select>
+              </label>
+              <label id="pref-flour-label" hidden>Flour prefermented %
+                <input type="number" id="pref-flour" min="0" max="100" step="5" />
+              </label>
+              <label id="pref-hydration-label" hidden>Hydration %
+                <input type="number" id="pref-hydration" min="0" step="5" />
+              </label>
+              <label id="pref-yeast-label" hidden>Yeast % of pref. flour
+                <input type="number" id="pref-yeast" min="0" step="0.05" />
+              </label>
+            </div>
+            <p class="bpc-note" id="pref-desc"></p>
+            <div class="bpc-split" id="pref-split" hidden>
+              <table>
+                <caption id="pref-caption">Preferment</caption>
+                <tbody id="pref-table"></tbody>
+              </table>
+              <table>
+                <caption>Final dough</caption>
+                <tbody id="final-table"></tbody>
+              </table>
+            </div>
+            <p class="bpc-warn" id="pref-warn" hidden></p>
+          </section>
+
+          <section class="bpc-panel">
+            <h2>Saved recipes</h2>
+            <div class="bpc-save-form">
+              <input type="text" id="recipe-name" placeholder="Recipe name" aria-label="Recipe name" />
+              <button type="button" class="bpc-btn bpc-btn-primary" id="save-recipe">Save</button>
+            </div>
+            <ul class="bpc-list" id="recipe-list"></ul>
+            <p class="bpc-note">Recipes are saved in this browser only.</p>
+          </section>
+        </div>
+
+        <section class="bpc-panel">
+          <h2>Guidance</h2>
+
+          <div class="bpc-metric">
+            <div class="bpc-metric-head">
+              <span>Hydration</span>
+              <span class="bpc-value" id="hydration-value">–</span>
+            </div>
+            <div class="bpc-meter" id="hydration-meter"></div>
+            <div class="bpc-scale" id="hydration-scale"></div>
+            <p class="bpc-verdict" id="hydration-verdict"></p>
+            <table class="bpc-guide-table" id="hydration-table"></table>
+          </div>
+
+          <div class="bpc-metric">
+            <div class="bpc-metric-head">
+              <span>Salt <span class="bpc-note">(target 1.8–2.2%)</span></span>
+              <span class="bpc-value" id="salt-value">–</span>
+            </div>
+            <div class="bpc-meter" id="salt-meter"></div>
+          </div>
+
+          <div class="bpc-metric">
+            <div class="bpc-metric-head">
+              <span>Yeast (instant)</span>
+              <span class="bpc-value" id="yeast-value">–</span>
+            </div>
+            <p class="bpc-verdict" id="yeast-verdict"></p>
+            <table class="bpc-guide-table">
+              <tr><td>0.2–0.5%</td><td>long / overnight ferments</td></tr>
+              <tr><td>1–1.5%</td><td>same-day bakes</td></tr>
+            </table>
+            <p class="bpc-note" id="yeast-convert"></p>
+          </div>
+
+          <p class="bpc-note">
+            Wholemeal and rye absorb more water — push hydration up a few
+            points when they're in the blend. Hydration here counts water only,
+            not milk, oil or eggs.
+          </p>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>© <span id="year">2026</span> Seb Carss</span>
+        <a href="https://github.com/sebcarss">GitHub</a>
+      </div>
+    </footer>
+
+    <script>
+      "use strict";
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      const $ = (id) => document.getElementById(id);
+
+      // ---- Reference ranges (all editable) --------------------------------
+      const HYDRATION_BANDS = [
+        { from: 55, to: 60, label: "Bagels & pretzels" },
+        { from: 60, to: 65, label: "Sandwich loaves & rolls" },
+        { from: 65, to: 72, label: "Baguettes & country loaves" },
+        { from: 72, to: 80, label: "Rustic loaves & focaccia" },
+        { from: 80, to: 90, label: "Ciabatta & very open crumb" },
+      ];
+      const HYDRATION_SCALE = [50, 90];
+      const SALT_TARGET = [1.8, 2.2];
+      const SALT_SCALE = [0, 4];
+
+      const PREFERMENTS = {
+        poolish: {
+          label: "Poolish",
+          desc: "Liquid preferment, equal flour and water, with a pinch of yeast. Ferment 8–16 h at room temperature. Classic for baguettes.",
+          flourPct: 30, hydration: 100, hydrationFixed: true, yeastPct: 0.1,
+        },
+        biga: {
+          label: "Biga",
+          desc: "Stiff Italian preferment, typically 45–60% hydration. Ferment 12–16 h somewhere cool. Classic for ciabatta.",
+          flourPct: 30, hydration: 50, hydrationFixed: false, yeastPct: 0.1,
+        },
+        levain: {
+          label: "Levain",
+          desc: "Sourdough preferment built from your starter (assumed 100% hydration by default). It replaces commercial yeast entirely.",
+          flourPct: 20, hydration: 100, hydrationFixed: false, yeastPct: null,
+        },
+      };
+
+      const LS_RECIPES = "bpc:recipes";
+
+      // ---- State ----------------------------------------------------------
+      // Percentages are the source of truth; gram fields write back to them.
+      let mode = "flour"; // "flour" | "target"
+      let flours = [{ name: "White bread flour", share: 100 }];
+      let extras = []; // { name, pct }
+      let pref = { type: "none", flourPct: 30, hydration: 100, yeastPct: 0.1 };
+
+      const loadRecipes = () => {
+        try {
+          return JSON.parse(localStorage.getItem(LS_RECIPES)) || [];
+        } catch {
+          return [];
+        }
+      };
+      let recipes = loadRecipes();
+
+      const num = (id) => Number($(id).value) || 0;
+      const fmt = (g, dp = 0) =>
+        g.toLocaleString("en-GB", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+
+      // ---- Core maths -----------------------------------------------------
+      function compute() {
+        const water = num("water-pct");
+        const salt = num("salt-pct");
+        const yeast = pref.type === "levain" ? 0 : num("yeast-pct");
+        const extrasPct = extras.reduce((s, e) => s + (Number(e.pct) || 0), 0);
+        const totalPct = 100 + water + salt + yeast + extrasPct;
+
+        let flourG;
+        if (mode === "flour") {
+          flourG = num("flour-grams");
+        } else {
+          flourG = (num("loaves") * num("loaf-weight")) / (totalPct / 100);
+        }
+        if (!(flourG > 0)) return null;
+
+        const g = (pct) => (flourG * pct) / 100;
+        return {
+          flourG,
+          water,
+          salt,
+          yeast,
+          totalPct,
+          waterG: g(water),
+          saltG: g(salt),
+          yeastG: g(yeast),
+          extrasG: extras.map((e) => g(Number(e.pct) || 0)),
+          totalG: g(totalPct),
+        };
+      }
+
+      function computePreferment(r) {
+        if (pref.type === "none" || !r) return null;
+        const pf = (r.flourG * pref.flourPct) / 100;
+        const pw = (pf * pref.hydration) / 100;
+        const py = pref.type === "levain" ? 0 : (pf * pref.yeastPct) / 100;
+        return {
+          flourG: pf,
+          waterG: pw,
+          yeastG: py,
+          totalG: pf + pw + py,
+          finalFlourG: r.flourG - pf,
+          finalWaterG: r.waterG - pw,
+          finalYeastG: r.yeastG - py,
+        };
+      }
+
+      // ---- Rendering ------------------------------------------------------
+      function renderFlourRows() {
+        const tbody = $("flour-rows");
+        tbody.textContent = "";
+        flours.forEach((f, idx) => {
+          const tr = document.createElement("tr");
+
+          const tdName = document.createElement("td");
+          const name = document.createElement("input");
+          name.type = "text";
+          name.value = f.name;
+          name.setAttribute("aria-label", "Flour name");
+          name.addEventListener("input", () => {
+            f.name = name.value;
+          });
+          tdName.appendChild(name);
+
+          const tdShare = document.createElement("td");
+          const share = document.createElement("input");
+          share.type = "number";
+          share.min = "0";
+          share.step = "5";
+          share.value = f.share;
+          share.setAttribute("aria-label", "Flour share percent");
+          share.addEventListener("input", () => {
+            f.share = share.value;
+            update(true);
+          });
+          tdShare.appendChild(share);
+
+          const tdG = document.createElement("td");
+          tdG.className = "bpc-grams flour-grams-cell";
+
+          const tdX = document.createElement("td");
+          if (flours.length > 1) {
+            const x = document.createElement("button");
+            x.type = "button";
+            x.className = "bpc-remove";
+            x.textContent = "✕";
+            x.setAttribute("aria-label", "Remove " + f.name);
+            x.addEventListener("click", () => {
+              flours.splice(idx, 1);
+              update();
+            });
+            tdX.appendChild(x);
+          }
+
+          tr.append(tdName, tdShare, tdG, tdX);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderExtraRows() {
+        const tbody = $("extra-rows");
+        tbody.textContent = "";
+        extras.forEach((e, idx) => {
+          const tr = document.createElement("tr");
+
+          const tdName = document.createElement("td");
+          const name = document.createElement("input");
+          name.type = "text";
+          name.value = e.name;
+          name.placeholder = "Extra ingredient";
+          name.setAttribute("list", "extra-suggestions");
+          name.setAttribute("aria-label", "Extra ingredient name");
+          name.addEventListener("input", () => {
+            e.name = name.value;
+          });
+          tdName.appendChild(name);
+
+          const tdPct = document.createElement("td");
+          const pct = document.createElement("input");
+          pct.type = "number";
+          pct.min = "0";
+          pct.step = "0.5";
+          pct.value = e.pct;
+          pct.setAttribute("aria-label", "Extra ingredient percent");
+          pct.addEventListener("input", () => {
+            e.pct = pct.value;
+            update(true);
+          });
+          tdPct.appendChild(pct);
+
+          const tdG = document.createElement("td");
+          const g = document.createElement("input");
+          g.type = "number";
+          g.min = "0";
+          g.step = "1";
+          g.className = "extra-grams";
+          g.setAttribute("aria-label", "Extra ingredient grams");
+          g.addEventListener("change", () => {
+            const r = compute();
+            if (r) {
+              e.pct = ((Number(g.value) || 0) / r.flourG) * 100;
+              pct.value = Math.round(e.pct * 10) / 10;
+              update(true);
+            }
+          });
+          tdG.appendChild(g);
+
+          const tdX = document.createElement("td");
+          const x = document.createElement("button");
+          x.type = "button";
+          x.className = "bpc-remove";
+          x.textContent = "✕";
+          x.setAttribute("aria-label", "Remove extra ingredient");
+          x.addEventListener("click", () => {
+            extras.splice(idx, 1);
+            update();
+          });
+          tdX.appendChild(x);
+
+          tr.append(tdName, tdPct, tdG, tdX);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function splitRow(tbody, label, grams, dp) {
+        const tr = document.createElement("tr");
+        const a = document.createElement("td");
+        a.textContent = label;
+        const b = document.createElement("td");
+        b.textContent = fmt(grams, dp) + " g";
+        tr.append(a, b);
+        tbody.appendChild(tr);
+        return tr;
+      }
+
+      function flourSplit(tbody, totalFlourG) {
+        const sum = flours.reduce((s, f) => s + (Number(f.share) || 0), 0) || 100;
+        if (flours.length === 1) {
+          splitRow(tbody, flours[0].name || "Flour", totalFlourG);
+        } else {
+          for (const f of flours) {
+            splitRow(tbody, f.name || "Flour", (totalFlourG * (Number(f.share) || 0)) / sum);
+          }
+        }
+      }
+
+      function renderPreferment(r) {
+        const p = PREFERMENTS[pref.type];
+        $("pref-flour-label").hidden = !p;
+        $("pref-hydration-label").hidden = !p;
+        $("pref-yeast-label").hidden = !p || p.yeastPct == null;
+        $("pref-desc").textContent = p ? p.desc : "A straight dough — all ingredients mixed in one go. Pick a preferment to split the recipe.";
+        $("pref-split").hidden = !p;
+        $("levain-note").hidden = pref.type !== "levain";
+        $("yeast-pct").disabled = pref.type === "levain";
+        $("yeast-g").disabled = pref.type === "levain";
+        const warn = $("pref-warn");
+        warn.hidden = true;
+        if (!p) return;
+
+        const setParam = (id, val) => {
+          if (document.activeElement !== $(id)) $(id).value = val;
+        };
+        setParam("pref-flour", pref.flourPct);
+        setParam("pref-hydration", pref.hydration);
+        $("pref-hydration").disabled = !!p.hydrationFixed;
+        if (p.yeastPct != null) setParam("pref-yeast", pref.yeastPct);
+        $("pref-caption").textContent = p.label;
+
+        const prefT = $("pref-table");
+        const finalT = $("final-table");
+        prefT.textContent = "";
+        finalT.textContent = "";
+        if (!r) return;
+
+        const s = computePreferment(r);
+        flourSplit(prefT, s.flourG);
+        splitRow(prefT, "Water", s.waterG);
+        if (pref.type !== "levain") splitRow(prefT, "Yeast", s.yeastG, 2);
+        const pt = splitRow(prefT, "Total", s.totalG);
+        pt.className = "total";
+
+        flourSplit(finalT, s.finalFlourG);
+        splitRow(finalT, "Water", s.finalWaterG);
+        splitRow(finalT, "Salt", r.saltG, 1);
+        if (pref.type !== "levain" && r.yeast > 0)
+          splitRow(finalT, "Yeast", s.finalYeastG, 2);
+        extras.forEach((e, i) =>
+          splitRow(finalT, e.name || "Extra", r.extrasG[i], 1)
+        );
+        splitRow(finalT, "All of the " + p.label.toLowerCase(), s.totalG);
+        const ft = splitRow(
+          finalT,
+          "Total",
+          s.finalFlourG + s.finalWaterG + r.saltG + Math.max(s.finalYeastG, 0) +
+            r.extrasG.reduce((a, b) => a + b, 0) + s.totalG
+        );
+        ft.className = "total";
+
+        const problems = [];
+        if (s.finalWaterG < 0)
+          problems.push("the preferment needs more water than the whole recipe has — raise overall hydration or shrink the preferment");
+        if (s.finalYeastG < 0)
+          problems.push("the preferment uses more yeast than the total — raise the yeast % or lower the preferment yeast");
+        if (problems.length) {
+          warn.textContent = "⚠ " + problems.join("; ") + ".";
+          warn.hidden = false;
+        }
+      }
+
+      function band(meter, from, to, scale, cls) {
+        const [lo, hi] = scale;
+        const div = document.createElement("div");
+        div.className = "band " + cls;
+        div.style.left = ((from - lo) / (hi - lo)) * 100 + "%";
+        div.style.width = ((to - from) / (hi - lo)) * 100 + "%";
+        meter.appendChild(div);
+      }
+
+      function marker(meter, value, scale) {
+        const [lo, hi] = scale;
+        const div = document.createElement("div");
+        div.className = "marker";
+        div.style.left =
+          Math.max(0, Math.min(((value - lo) / (hi - lo)) * 100, 99)) + "%";
+        meter.appendChild(div);
+      }
+
+      function renderGuidance(r) {
+        // Hydration
+        const hm = $("hydration-meter");
+        hm.textContent = "";
+        HYDRATION_BANDS.forEach((b, i) =>
+          band(hm, b.from, b.to, HYDRATION_SCALE, i % 2 ? "alt" : "")
+        );
+        const hs = $("hydration-scale");
+        if (!hs.childElementCount) {
+          const ticks = [50, 55, 60, 65, 72, 80, 90];
+          for (const t of ticks) {
+            const span = document.createElement("span");
+            span.textContent = t;
+            span.style.left =
+              ((t - HYDRATION_SCALE[0]) / (HYDRATION_SCALE[1] - HYDRATION_SCALE[0])) * 100 + "%";
+            hs.appendChild(span);
+          }
+        }
+        const ht = $("hydration-table");
+        if (!ht.childElementCount) {
+          for (const b of HYDRATION_BANDS) {
+            const tr = document.createElement("tr");
+            const a = document.createElement("td");
+            a.textContent = b.from + "–" + b.to + "%";
+            const c = document.createElement("td");
+            c.textContent = b.label;
+            tr.append(a, c);
+            ht.appendChild(tr);
+          }
+        }
+
+        if (r) {
+          const h = r.water;
+          marker(hm, h, HYDRATION_SCALE);
+          $("hydration-value").textContent = h.toFixed(0) + "%";
+          const match = HYDRATION_BANDS.find((b) => h >= b.from && h < b.to);
+          $("hydration-verdict").textContent = match
+            ? "→ " + match.label.toLowerCase() + " territory."
+            : h < HYDRATION_BANDS[0].from
+              ? "→ stiffer than typical bread doughs."
+              : "→ wetter than most doughs — batter territory.";
+        } else {
+          $("hydration-value").textContent = "–";
+          $("hydration-verdict").textContent = "";
+        }
+
+        // Salt
+        const sm = $("salt-meter");
+        sm.textContent = "";
+        band(sm, SALT_TARGET[0], SALT_TARGET[1], SALT_SCALE, "target");
+        const sv = $("salt-value");
+        if (r) {
+          marker(sm, r.salt, SALT_SCALE);
+          sv.textContent = r.salt.toFixed(1) + "%";
+          sv.className =
+            "bpc-value " +
+            (r.salt >= SALT_TARGET[0] && r.salt <= SALT_TARGET[1] ? "ok" : "off");
+        } else {
+          sv.textContent = "–";
+          sv.className = "bpc-value";
+        }
+
+        // Yeast
+        const yv = $("yeast-value");
+        if (r && pref.type === "levain") {
+          yv.textContent = "levain";
+          yv.className = "bpc-value";
+          $("yeast-verdict").textContent = "Leavened by the sourdough levain.";
+          $("yeast-convert").textContent = "";
+        } else if (r) {
+          yv.textContent = r.yeast.toFixed(1) + "%";
+          yv.className = "bpc-value";
+          $("yeast-verdict").textContent =
+            r.yeast === 0
+              ? "No yeast — is that intentional?"
+              : r.yeast <= 0.5
+                ? "Long-ferment territory: expect an overnight rise."
+                : r.yeast <= 1.5
+                  ? "Same-day territory."
+                  : "That's a lot of yeast — fine for enriched quick doughs.";
+          $("yeast-convert").textContent =
+            "≈ " + fmt(r.yeastG * 1.25, 1) + " g active dry or " +
+            fmt(r.yeastG * 3, 1) + " g fresh yeast.";
+        } else {
+          yv.textContent = "–";
+          $("yeast-verdict").textContent = "";
+          $("yeast-convert").textContent = "";
+        }
+      }
+
+      function update(skipStructure) {
+        if (!skipStructure) {
+          renderFlourRows();
+          renderExtraRows();
+        }
+        const r = compute();
+
+        // Blend warning + per-flour grams
+        const sum = flours.reduce((s, f) => s + (Number(f.share) || 0), 0);
+        const bw = $("blend-warn");
+        if (Math.round(sum * 10) / 10 !== 100) {
+          bw.textContent = "⚠ Flour shares add up to " + fmt(sum, 1) + "% — they should total 100%.";
+          bw.hidden = false;
+        } else {
+          bw.hidden = true;
+        }
+        const flourCells = document.querySelectorAll(".flour-grams-cell");
+        flours.forEach((f, i) => {
+          if (!flourCells[i]) return;
+          flourCells[i].textContent =
+            r ? fmt((r.flourG * (Number(f.share) || 0)) / (sum || 100)) + " g" : "–";
+        });
+
+        // Gram fields (derived; source of truth is the %)
+        const setG = (id, val, dp) => {
+          const el = $(id);
+          if (document.activeElement !== el)
+            el.value = r ? Math.round(val * 10 ** dp) / 10 ** dp : "";
+        };
+        if (r) {
+          setG("water-g", r.waterG, 0);
+          setG("salt-g", r.saltG, 1);
+          setG("yeast-g", r.yeastG, 1);
+          const extraInputs = document.querySelectorAll(".extra-grams");
+          extras.forEach((e, i) => {
+            if (extraInputs[i] && document.activeElement !== extraInputs[i])
+              extraInputs[i].value = Math.round(r.extrasG[i]);
+          });
+        }
+        const readonly = mode === "target";
+        for (const id of ["water-g", "salt-g", "yeast-g"]) $(id).readOnly = readonly;
+        document.querySelectorAll(".extra-grams").forEach((el) => (el.readOnly = readonly));
+
+        $("total-pct").textContent = r ? fmt(r.totalPct, 1) + "%" : "–";
+        $("total-g").textContent = r ? fmt(r.totalG) + " g" : "–";
+        $("target-flour-note").textContent =
+          r && mode === "target" ? "→ needs " + fmt(r.flourG) + " g flour" : "";
+        const pl = $("per-loaf-note");
+        if (r && mode === "target") {
+          pl.textContent =
+            fmt(num("loaves")) + " loaves × " + fmt(num("loaf-weight")) + " g = " +
+            fmt(r.totalG) + " g dough in total.";
+          pl.hidden = false;
+        } else {
+          pl.hidden = true;
+        }
+
+        renderPreferment(r);
+        renderGuidance(r);
+      }
+
+      // ---- Wiring ---------------------------------------------------------
+      function setMode(m) {
+        mode = m;
+        $("mode-flour").setAttribute("aria-pressed", String(m === "flour"));
+        $("mode-target").setAttribute("aria-pressed", String(m === "target"));
+        $("flour-inputs").hidden = m !== "flour";
+        $("target-inputs").hidden = m !== "target";
+        update(true);
+      }
+      $("mode-flour").addEventListener("click", () => setMode("flour"));
+      $("mode-target").addEventListener("click", () => setMode("target"));
+
+      for (const id of ["flour-grams", "loaves", "loaf-weight", "water-pct", "salt-pct", "yeast-pct"]) {
+        $(id).addEventListener("input", () => update(true));
+      }
+
+      // Gram fields write back to the percentage (flour-weight mode only).
+      const gramToPct = (gId, pctId) => {
+        $(gId).addEventListener("change", () => {
+          if (mode === "target") return;
+          const r = compute();
+          if (!r) return;
+          const pct = (num(gId) / r.flourG) * 100;
+          $(pctId).value = Math.round(pct * 10) / 10;
+          update(true);
+        });
+      };
+      gramToPct("water-g", "water-pct");
+      gramToPct("salt-g", "salt-pct");
+      gramToPct("yeast-g", "yeast-pct");
+
+      $("add-flour").addEventListener("click", () => {
+        flours.push({ name: "", share: 0 });
+        update();
+        const inputs = $("flour-rows").querySelectorAll('input[type="text"]');
+        inputs[inputs.length - 1].focus();
+      });
+
+      $("add-extra").addEventListener("click", () => {
+        extras.push({ name: "", pct: 0 });
+        update();
+        const inputs = $("extra-rows").querySelectorAll('input[type="text"]');
+        inputs[inputs.length - 1].focus();
+      });
+
+      $("pref-type").addEventListener("change", () => {
+        const t = $("pref-type").value;
+        const p = PREFERMENTS[t];
+        pref = p
+          ? { type: t, flourPct: p.flourPct, hydration: p.hydration, yeastPct: p.yeastPct ?? 0 }
+          : { type: "none", flourPct: 30, hydration: 100, yeastPct: 0.1 };
+        update(true);
+      });
+      $("pref-flour").addEventListener("input", () => {
+        pref.flourPct = num("pref-flour");
+        update(true);
+      });
+      $("pref-hydration").addEventListener("input", () => {
+        pref.hydration = num("pref-hydration");
+        update(true);
+      });
+      $("pref-yeast").addEventListener("input", () => {
+        pref.yeastPct = num("pref-yeast");
+        update(true);
+      });
+
+      // ---- Saved recipes --------------------------------------------------
+      const saveRecipes = () => localStorage.setItem(LS_RECIPES, JSON.stringify(recipes));
+
+      function snapshot(name) {
+        return {
+          name,
+          mode,
+          flourGrams: num("flour-grams"),
+          loaves: num("loaves"),
+          loafWeight: num("loaf-weight"),
+          flours: flours.map((f) => ({ name: f.name, share: Number(f.share) || 0 })),
+          water: num("water-pct"),
+          salt: num("salt-pct"),
+          yeast: num("yeast-pct"),
+          extras: extras.map((e) => ({ name: e.name, pct: Number(e.pct) || 0 })),
+          pref: { ...pref },
+        };
+      }
+
+      function applyRecipe(r) {
+        $("flour-grams").value = r.flourGrams;
+        $("loaves").value = r.loaves;
+        $("loaf-weight").value = r.loafWeight;
+        $("water-pct").value = r.water;
+        $("salt-pct").value = r.salt;
+        $("yeast-pct").value = r.yeast;
+        flours = r.flours.map((f) => ({ ...f }));
+        extras = r.extras.map((e) => ({ ...e }));
+        pref = { ...r.pref };
+        $("pref-type").value = pref.type;
+        $("recipe-name").value = r.name;
+        setMode(r.mode);
+        update();
+      }
+
+      function renderRecipes() {
+        const ul = $("recipe-list");
+        ul.textContent = "";
+        for (const r of recipes) {
+          const li = document.createElement("li");
+          const info = document.createElement("span");
+          info.textContent = r.name + " ";
+          const meta = document.createElement("span");
+          meta.className = "meta";
+          const prefLabel = PREFERMENTS[r.pref.type];
+          meta.textContent =
+            r.water + "% hydration" + (prefLabel ? " · " + prefLabel.label.toLowerCase() : "");
+          info.appendChild(meta);
+
+          const btns = document.createElement("span");
+          btns.className = "btns";
+          const load = document.createElement("button");
+          load.type = "button";
+          load.className = "bpc-btn";
+          load.textContent = "Load";
+          load.addEventListener("click", () => applyRecipe(r));
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "bpc-btn";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => {
+            if (!confirm('Delete recipe "' + r.name + '"?')) return;
+            recipes = recipes.filter((x) => x !== r);
+            saveRecipes();
+            renderRecipes();
+          });
+          btns.append(load, del);
+          li.append(info, btns);
+          ul.appendChild(li);
+        }
+      }
+
+      $("save-recipe").addEventListener("click", () => {
+        const name = $("recipe-name").value.trim();
+        if (!name) {
+          $("recipe-name").focus();
+          return;
+        }
+        const entry = snapshot(name);
+        const existing = recipes.findIndex((r) => r.name === name);
+        if (existing >= 0) recipes[existing] = entry;
+        else recipes.push(entry);
+        saveRecipes();
+        renderRecipes();
+      });
+
+      // ---- Init -----------------------------------------------------------
+      renderRecipes();
+      update();
+    </script>
+  </body>
+</html>

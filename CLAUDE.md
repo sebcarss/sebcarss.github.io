@@ -23,6 +23,7 @@ music/index.html              "Music" category page
 music/tab-caster/index.html   Tab Caster utility (fully self-contained)
 food/index.html               "Food" category page
 food/ice-cream-calculator/index.html   Ice Cream Calculator utility
+food/bakers-percentage/index.html      Baker's Percentage Calculator utility
 ```
 
 Each category (e.g. `music/`) has its own `index.html` listing the utilities
@@ -87,3 +88,22 @@ Key things to know:
 - Custom ingredients and saved recipes persist to localStorage under
   `icc:ingredients` and `icc:recipes`; recipes reference ingredients by name.
 - Plain DOM JS, no dependencies. `$()` is a `getElementById` shorthand.
+
+## Baker's Percentage Calculator (`food/bakers-percentage/index.html`)
+
+A single-file bread-dough tool built on baker's percentages (flour = 100%,
+everything else a % of total flour). Same house style as the ice cream
+calculator: reuses `/styles.css` + standard nav/footer, page-local `<style>`
+with a `bpc-` prefix, plain DOM JS, `$()` shorthand. Key things to know:
+
+- **Percentages are the source of truth**; gram inputs write back to the %
+  on change ("flour weight" mode only — in "target dough" mode gram fields
+  are read-only and the flour weight is derived from loaves × g/loaf).
+- **Preferments** (`PREFERMENTS`): poolish/biga/levain split the recipe into
+  Preferment and Final dough tables. The preferment's flour, water and yeast
+  pinch are subtracted from the overall totals, so the grand totals and
+  percentages never change; levain zeroes/disables the commercial yeast row.
+- **Guidance ranges** live in `HYDRATION_BANDS`, `SALT_TARGET` and the yeast
+  verdict logic — approximate published figures, safe to tune.
+- Saved recipes persist to localStorage under `bpc:recipes` as full state
+  snapshots (`snapshot()`/`applyRecipe()`).
