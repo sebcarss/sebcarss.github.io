@@ -81,11 +81,13 @@
   body.fs.showbar #toolbar { transform: translateY(0); }
   #toolbar .group { display: flex; align-items: center; gap: 6px; }
   #toolbar label { opacity: .7; }
-  #toolbar button {
+  #toolbar button, #toolbar a, #toolbar select {
     background: #33373e; color: var(--bar-text); border: none;
     border-radius: 6px; padding: 5px 11px; font-size: 13px; cursor: pointer;
   }
-  #toolbar button:hover { background: #43484f; }
+  #toolbar button:hover, #toolbar a:hover, #toolbar select:hover { background: #43484f; }
+  #toolbar a { text-decoration: none; }
+  #toolbar select { max-width: 260px; }
   #toolbar button.active { background: var(--accent); color: #fff; }
   #fileName { font-weight: 600; max-width: 260px; overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
@@ -120,6 +122,7 @@
   body.dark #landing { color: #aaa; }
   #landing h1 { font-size: 26px; font-weight: 700; }
   #landing p { max-width: 520px; line-height: 1.5; }
+  #landing a { color: inherit; }
   #landing .bigbtn {
     background: var(--accent); color: #fff; border: none; border-radius: 10px;
     padding: 14px 28px; font-size: 17px; font-weight: 600; cursor: pointer;
@@ -156,8 +159,10 @@
 
 <div id="toolbar">
   <div class="group">
-    <button id="openBtn" title="Open a PDF (O)">Open PDF</button>
+    <a id="homeLink" href="/" title="Back to sebcarss.github.io">‹ Home</a>
+    <button id="openBtn" title="Open PDFs or a folder (O)">Open PDF</button>
     <span id="fileName"></span>
+    <select id="songSel" style="display:none" title="Choose song (←/→)"></select>
   </div>
   <div class="group" id="colGroup">
     <label>Columns</label>
@@ -185,22 +190,23 @@
 <div id="landing">
   <h1>Tab Screen</h1>
   <div id="dropHint">
-    <p><strong>Drop an Ultimate Guitar PDF here</strong><br>or</p><br>
-    <button class="bigbtn" id="openBtn2">Choose a PDF…</button>
+    <p><strong>Drop an Ultimate Guitar PDF here</strong> — or a whole folder of them —<br>or</p><br>
+    <button class="bigbtn" id="openBtn2">Choose PDFs…</button>
   </div>
   <p>The song is sliced into its sections — title, chord diagrams, strumming
      pattern and lyrics — and reflowed into columns so the whole song fits on
      one screen. Chords, lyrics and [section] markers are colour-coded for
      easier reading. Double-click any section to hide it. Keyboard: <b>1–4</b> columns,
      <b>A</b>uto, <b>+ / −</b> size, <b>F</b>it, <b>C</b>olours, <b>D</b>ark,
-     <b>Enter</b> full screen.</p>
+     <b>Enter</b> full screen, <b>←/→</b> prev/next song.</p>
+  <p><a href="/">‹ Back to sebcarss.github.io</a></p>
 </div>
 
 <div id="sheetWrap" style="display:none"><div id="sheet"></div></div>
 <div id="dragOverlay">Drop PDF to open</div>
 <div id="toast"></div>
 <div id="spin">Reading PDF…</div>
-<input type="file" id="fileInput" accept="application/pdf" style="display:none">
+<input type="file" id="fileInput" accept="application/pdf" multiple style="display:none">
 
 <script>
 'use strict';
@@ -245,11 +251,20 @@ function segmentPage(data, W, H, scale) {
   }
   function gapRuns(prof, minRun) {
     const runs = []; let start = -1;
-    for (let i = 0; i < prof.length; i++) {
-      if (prof[i] === 0) { if (start < 0) start = i; }
+    for (let i = 0; i <= prof.length; i++) {
+      if (i < prof.length && prof[i] === 0) { if (start < 0) start = i; }
       else { if (start >= 0 && i - start >= minRun) runs.push([start, i]); start = -1; }
     }
     return runs;
+  }
+  function intersectRuns(a, b) {
+    const out = [];
+    for (const [s1, e1] of a)
+      for (const [s2, e2] of b) {
+        const s = Math.max(s1, s2), e = Math.min(e1, e2);
+        if (e - s >= VT) out.push([s, e]);
+      }
+    return out;
   }
   function vProfileIgnoringRules(x0, y0, x1, y1) {
     // Thin full-width horizontal rules (e.g. the divider under the title)
@@ -289,16 +304,84 @@ function segmentPage(data, W, H, scale) {
       return;
     }
     const pts = [0, ...runs.map(([s, e]) => (s + e) >> 1), len];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i + 1];
-      cut(axis === 'h' ? [x0, y0 + a, x1, y0 + b] : [x0 + a, y0, x0 + b, y1],
-          axis === 'h' ? 'v' : 'h');
+    if (axis === 'v') {
+      for (let i = 0; i < pts.length - 1; i++)
+        cut([x0 + pts[i], y0, x0 + pts[i + 1], y1], 'h');
+      return;
     }
+    // Two-column pages: when section gaps in the left and right columns
+    // happen to align, the row profile shows a "full-width" gap and the
+    // bands above/below it would come out column-interleaved. So before
+    // recursing, merge consecutive bands that share a vertical gutter and
+    // cut that gutter first, keeping reading order column-major.
+    const bands = [];
+    for (let i = 0; i < pts.length - 1; i++)
+      bands.push([x0, y0 + pts[i], x1, y0 + pts[i + 1]]);
+    const info = bands.map(b => {
+      const bt = trim(b[0], b[1], b[2], b[3]);
+      if (!bt) return { runs: [], interior: [] };
+      // profile over the full parent width so one-sided bands (chord
+      // diagrams, strumming pattern) count edge whitespace as a gap
+      const prof = vProfileIgnoringRules(x0, bt[1], x1, bt[3]);
+      let eL = 0, eR = prof.length;
+      while (eL < prof.length && prof[eL] === 0) eL++;
+      while (eR > eL && prof[eR - 1] === 0) eR--;
+      const runs = gapRuns(prof, VT);
+      // interior = gaps with ink on BOTH sides: a genuine column gutter,
+      // not coincidental margin whitespace
+      return { runs, interior: runs.filter(r => eL < r[0] && r[1] < eR) };
+    });
+    // Cores: consecutive bands whose ink straddles a common gutter (a
+    // real multi-column region). One-sided neighbours whose whitespace
+    // spans that gutter are pulled in, so a column that runs longer than
+    // the other keeps its tail in reading order.
+    const used = new Array(bands.length).fill(false);
+    const plans = [];
+    for (let i = 0; i < bands.length; ) {
+      if (used[i] || !info[i].interior.length) { i++; continue; }
+      let shared = info[i].interior, j = i;
+      while (j + 1 < bands.length && !used[j + 1] && info[j + 1].interior.length) {
+        const next = intersectRuns(shared, info[j + 1].interior);
+        if (!next.length) break;
+        shared = next; j++;
+      }
+      if (bands[j][3] - bands[i][1] >= MINCOLH) {
+        const cx = (x1 - x0) / 2;   // prefer the gutter nearest the centre
+        let g = shared[0];
+        for (const r of shared)
+          if (Math.abs((r[0] + r[1]) / 2 - cx) < Math.abs((g[0] + g[1]) / 2 - cx)) g = r;
+        const mid = (g[0] + g[1]) >> 1;
+        // any band whose whitespace spans the cut point can join the group
+        const covers = k => !used[k] &&
+          info[k].runs.some(r => r[0] <= mid - VT / 2 && r[1] >= mid + VT / 2);
+        let a = i, b = j;
+        while (a > 0 && covers(a - 1)) a--;
+        while (b + 1 < bands.length && covers(b + 1)) b++;
+        // a lone core with nothing pulled in cuts identically via the
+        // normal 'v' path below, so only plan real multi-band groups
+        if (b > a) {
+          for (let k = a; k <= b; k++) used[k] = true;
+          plans.push({ a, b, mid });
+        }
+      }
+      i = j + 1;
+    }
+    let n = 0;
+    for (const p of plans) {
+      for (; n < p.a; n++) cut(bands[n], 'v');
+      cut([x0, bands[p.a][1], x0 + p.mid, bands[p.b][3]], 'h');   // left column first
+      cut([x0 + p.mid, bands[p.a][1], x1, bands[p.b][3]], 'h');   // then right
+      n = p.b + 1;
+    }
+    for (; n < bands.length; n++) cut(bands[n], 'v');
   }
   cut([0, 0, W, H], 'h');
-  // Drop the Ultimate Guitar watermark logo (top-right) and page footer.
-  return blocks.filter(([x0, y0, , y1]) =>
-    !(y0 > 0.94 * H) && !(x0 > 0.80 * W && y1 < 0.15 * H));
+  // Drop the Ultimate Guitar watermark logo (top-right), the page footer,
+  // and stray fragments of horizontal rules (left when a column cut passes
+  // through a full-width rule).
+  return blocks.filter(([x0, y0, x1, y1]) =>
+    !(y0 > 0.94 * H) && !(x0 > 0.80 * W && y1 < 0.15 * H) &&
+    !(y1 - y0 < 2 * scale && x1 - x0 > 8 * (y1 - y0)));
 }
 
 /* ========== Line classification & colour tinting ==========
@@ -618,7 +701,8 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+  if ((e.target.tagName === 'INPUT' && e.target.type !== 'range') ||
+      e.target.tagName === 'SELECT') return;
   const k = e.key.toLowerCase();
   if (k >= '1' && k <= '4') { setCols(+k); }
   else if (k === 'a') setCols(0);
@@ -627,6 +711,8 @@ document.addEventListener('keydown', e => {
   else if (k === 'd') $('darkBtn').click();
   else if (k === 'enter') toggleFS();
   else if (k === 'o') $('fileInput').click();
+  else if (k === 'arrowright' || k === ']') { if (playlist.length > 1) { e.preventDefault(); playSong(plIndex + 1); } }
+  else if (k === 'arrowleft' || k === '[') { if (playlist.length > 1) { e.preventDefault(); playSong(plIndex - 1); } }
   else if (k === '+' || k === '=') { zoom = Math.min(3, zoom + 0.05); autoFitOnChange = false; applyLayout(currentCols(), zoom); }
   else if (k === '-') { zoom = Math.max(0.2, zoom - 0.05); autoFitOnChange = false; applyLayout(currentCols(), zoom); }
 });
@@ -635,21 +721,77 @@ function setCols(n) {
   if (b) b.click();
 }
 
-/* ================= File input / drag-drop ================= */
+/* ================= File input / drag-drop / playlist ================= */
+let playlist = [];   // File objects, sorted by name
+let plIndex = -1;
+
+function setPlaylist(files) {
+  const pdfs = files.filter(f => /\.pdf$/i.test(f.name))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (!pdfs.length) { toast('No PDF files found'); return; }
+  playlist = pdfs;
+  const sel = $('songSel');
+  sel.innerHTML = '';
+  playlist.forEach((f, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = f.name.replace(/\.pdf$/i, '');
+    sel.appendChild(o);
+  });
+  const many = playlist.length > 1;
+  sel.style.display = many ? '' : 'none';
+  $('fileName').style.display = many ? 'none' : '';
+  playSong(0);
+}
+
+function playSong(i) {
+  if (!playlist.length || document.body.classList.contains('busy')) {
+    if (plIndex >= 0) $('songSel').value = plIndex;   // undo a mid-load pick
+    return;
+  }
+  plIndex = (i + playlist.length) % playlist.length;
+  $('songSel').value = plIndex;
+  if (playlist.length > 1)
+    toast(`${plIndex + 1}/${playlist.length} — ${playlist[plIndex].name.replace(/\.pdf$/i, '')}`);
+  loadPDF(playlist[plIndex]);
+}
+
+$('songSel').addEventListener('change', e => { playSong(+e.target.value); e.target.blur(); });
 $('openBtn').addEventListener('click', () => $('fileInput').click());
 $('openBtn2').addEventListener('click', () => $('fileInput').click());
 $('fileInput').addEventListener('change', e => {
-  if (e.target.files[0]) loadPDF(e.target.files[0]);
+  if (e.target.files.length) setPlaylist([...e.target.files]);
   e.target.value = '';
 });
+
+async function readEntries(entries) {
+  const out = [];
+  async function walk(en) {
+    if (en.isFile) out.push(await new Promise((res, rej) => en.file(res, rej)));
+    else if (en.isDirectory) {
+      const rd = en.createReader();   // readEntries returns batches of <= 100
+      let batch;
+      do {
+        batch = await new Promise((res, rej) => rd.readEntries(res, rej));
+        for (const c of batch) await walk(c);
+      } while (batch.length);
+    }
+  }
+  for (const en of entries) await walk(en);
+  return out;
+}
+
 let dragDepth = 0;
 window.addEventListener('dragenter', e => { e.preventDefault(); if (++dragDepth) document.body.classList.add('dragging'); });
 window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
 window.addEventListener('dragover', e => e.preventDefault());
-window.addEventListener('drop', e => {
+window.addEventListener('drop', async e => {
   e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
-  const f = [...e.dataTransfer.files].find(f => /\.pdf$/i.test(f.name));
-  if (f) loadPDF(f); else toast('Please drop a PDF file');
+  // entries must be collected synchronously, before any await
+  const entries = [...e.dataTransfer.items]
+    .map(it => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+  const plain = [...e.dataTransfer.files];
+  const files = entries.length ? await readEntries(entries) : plain;
+  setPlaylist(files);
 });
 
 // keep --barH in sync with the (possibly wrapped) toolbar height

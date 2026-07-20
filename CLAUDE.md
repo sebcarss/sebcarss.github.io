@@ -56,7 +56,14 @@ Key things to know before touching it:
   the embedded library. It has three main parts:
   - **Segmentation** (`segmentPage`): recursive XY-cut algorithm that slices
     a rendered PDF page into content blocks along whitespace gaps, so the
-    original Ultimate Guitar layout is preserved.
+    original Ultimate Guitar layout is preserved. Two-column pages need the
+    column-grouping pass inside `cut`: bands whose ink straddles a shared
+    vertical gutter (plus one-sided neighbours whose whitespace spans the
+    cut point) are cut at the gutter *first*, so blocks come out in
+    column-major reading order (left column top-to-bottom, then right)
+    instead of interleaved. Don't "simplify" that pass away — aligned
+    section gaps in the two columns otherwise masquerade as full-width
+    horizontal cuts.
   - **Classification & tinting** (`classifyBands`, `tintAll`): classifies
     each line of a block as chord/lyric/section/neutral using pixel
     statistics (stroke weight for bold chord names, tall thin glyphs for
@@ -66,6 +73,11 @@ Key things to know before touching it:
     keyboard shortcuts, drag-and-drop, fullscreen handling): arranges
     segmented blocks into a CSS multi-column sheet and picks the
     column count/zoom that best fills the screen.
+  - **Playlist** (`setPlaylist`, `playSong`): multi-select or drop a whole
+    folder of PDFs; files are sorted by name into a toolbar `<select>`
+    (shown only for >1 song) and switched with ←/→ or [ ] — songs re-parse
+    on switch, nothing is cached. The toolbar also has a "‹ Home" link
+    back to the homepage.
 - Everything is plain DOM/canvas JS — no framework, no build step. `$()` is
   a `getElementById` shorthand defined near the top of the app script.
 
