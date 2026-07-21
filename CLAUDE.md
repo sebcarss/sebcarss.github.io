@@ -111,7 +111,11 @@ Key things to know:
 - **Progressions**: `progression` is an array of 1-based degrees, set from
   the text box (`parseProgression()` accepts `1 4 5` or `ii V I`), the
   `PRESETS` list, or number keys 1–7. Each step gets a colour from
-  `STEP_COLOURS`, passed into CSS as a `--c` rgb triple on the cell.
+  `STEP_COLOURS`, passed into CSS as a `--c` rgb triple on the cell. When a
+  progression is set, a trailing column (`th.progHead` / `td.prog`) spells it
+  out per key as coloured `.chip` pills — C major with I–V–vi–IV reads
+  "C G Am F". Chips show the chord symbol, falling back to the bare note
+  under `body.notes-only` or `body.nochords`.
 - **Sizing**: `fit()` measures the table at a known font size and scales
   `#chart`'s `font-size` so it fills the viewport; every inner dimension is
   in `em` so the whole grid scales together. `autoFit` stays true until the

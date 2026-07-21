@@ -123,6 +123,28 @@
     border-radius: .3em .3em 0 0;
   }
   #chart thead th.hl .rom, #chart thead th.hl .deg { color: #fff; }
+  /* trailing column: the progression spelled out for that key */
+  #chart th.progHead, #chart td.prog {
+    border-left: 2px solid var(--line);
+    padding-left: .7em; text-align: left;
+  }
+  .chip {
+    display: inline-block; margin-right: .3em; padding: .1em .4em;
+    border-radius: .28em; font-weight: 700;
+    background: rgb(var(--c) / var(--hl-alpha)); color: rgb(var(--c));
+  }
+  body.dark .chip { filter: brightness(1.35); }
+  .chip:last-child { margin-right: 0; }
+  th.progHead .chip { font-size: .8em; }
+  /* a chip shows the chord symbol; the bare note only when chords are off */
+  .chip .note { display: none; }
+  .chip .chord {
+    display: inline; font-size: inherit; color: inherit;
+    font-weight: 700; margin: 0;
+  }
+  body.notes-only .chip .note, body.nochords .chip .note { display: inline; }
+  body.notes-only .chip .chord, body.nochords .chip .chord { display: none; }
+
   .step {
     display: inline-block; margin-left: .35em; font-size: .42em; font-weight: 700;
     vertical-align: super; color: rgb(var(--c)); letter-spacing: .05em;
@@ -382,6 +404,11 @@ let sevenths = false;
 let progression = [];
 let baseFs = 20, zoom = 1, autoFit = true;
 
+// One coloured pill for step `si` of the progression (colour matches the legend).
+function stepChip(si, inner) {
+  return `<span class="chip" style="--c:${STEP_COLOURS[si % STEP_COLOURS.length]}">${inner}</span>`;
+}
+
 function render() {
   document.body.classList.toggle('nochords', !!scale.degLabels);
   const roots = pickRoots(scale);
@@ -406,6 +433,11 @@ function render() {
             `<span class="rom">${romanFor(scale, i, sevenths)}</span>${badge}` +
             `<span class="deg">${scale.degLabels ? 'degree ' + d : d}</span></th>`;
   }
+  if (progression.length) {
+    const romans = progression.map((d, si) => stepChip(si, d > n ? '?' : romanFor(scale, d - 1, sevenths)));
+    head += `<th class="progHead">${romans.join('')}` +
+            `<span class="deg">progression</span></th>`;
+  }
   head += '</tr></thead>';
 
   let body = '<tbody>';
@@ -422,6 +454,15 @@ function render() {
       body += `<td class="${on ? 'hl' : ''}"${style}>` +
               `<span class="note">${note.name}</span>${chord}</td>`;
     });
+    if (progression.length) {
+      body += '<td class="prog">' + progression.map((d, si) => {
+        if (d > n) return stepChip(si, '–');
+        const note = notes[d - 1];
+        const suffix = scale.degLabels ? '' : chordAt(scale, d - 1, sevenths).suffix;
+        return stepChip(si, `<span class="note">${note.name}</span>` +
+                            `<span class="chord">${note.name}${suffix}</span>`);
+      }).join('') + '</td>';
+    }
     body += '</tr>';
   }
   body += '</tbody>';
