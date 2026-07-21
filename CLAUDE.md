@@ -21,6 +21,7 @@ styles.css                    Shared styles for every page (nav, cards, footer)
 404.html                      Not-found page
 music/index.html              "Music" category page
 music/tab-caster/index.html   Tab Caster utility (fully self-contained)
+music/scale-charts/index.html Scale Charts utility (fully self-contained)
 food/index.html               "Food" category page
 food/ice-cream-calculator/index.html   Ice Cream Calculator utility
 food/bakers-percentage/index.html      Baker's Percentage Calculator utility
@@ -80,6 +81,41 @@ Key things to know before touching it:
     back to the homepage.
 - Everything is plain DOM/canvas JS — no framework, no build step. `$()` is
   a `getElementById` shorthand defined near the top of the app script.
+
+## Scale Charts (`music/scale-charts/index.html`)
+
+A single self-contained HTML file (no external requests) showing, for one
+scale type at a time, a grid of every key (rows) against every scale degree
+(columns), with the note and the diatonic chord in each cell. Built for
+casting to a TV, so it shares Tab Caster's chrome: dark toolbar, orange
+accent, `body.dark` / `body.fs` classes, fullscreen with a toolbar that
+reappears near the top edge, `--barH` kept in sync by a `ResizeObserver`.
+Key things to know:
+
+- **Spelling is computed, not tabulated.** `scaleNotes()` gives each degree
+  its own letter name (root letter + `letterSteps[i]`) and derives the
+  accidental from the semitone interval, so C major is C D E F G A B and
+  D♭ major is D♭ E♭ F G♭ A♭ B♭ C — never enharmonic mush. `pickRoots()`
+  then chooses between the enharmonic spellings in `ROOT_CANDIDATES`
+  (e.g. D♭ vs C♯) by picking whichever spells the scale with the fewest
+  accidentals, double accidentals heavily penalised. Consequence: the 12
+  row labels change with the selected scale (D♭ major, but C♯ natural
+  minor). That's intended.
+- **Scales** live in `SCALES` (7-note modes plus harmonic/melodic minor,
+  and pentatonic/blues). A scale with `degLabels` is note-only: it has no
+  diatonic chords, sets `body.nochords`, and needs `letterSteps` because
+  its degrees don't advance one letter at a time.
+- **Chords** come from `chordAt()` (stacked thirds within the scale) and
+  `romanFor()` (numeral case + °/ø/+ and seventh suffixes). Roman numerals
+  are a property of the scale, not the key, so they render once in `<thead>`.
+- **Progressions**: `progression` is an array of 1-based degrees, set from
+  the text box (`parseProgression()` accepts `1 4 5` or `ii V I`), the
+  `PRESETS` list, or number keys 1–7. Each step gets a colour from
+  `STEP_COLOURS`, passed into CSS as a `--c` rgb triple on the cell.
+- **Sizing**: `fit()` measures the table at a known font size and scales
+  `#chart`'s `font-size` so it fills the viewport; every inner dimension is
+  in `em` so the whole grid scales together. `autoFit` stays true until the
+  user touches the zoom slider or +/-.
 
 ## Ice Cream Calculator (`food/ice-cream-calculator/index.html`)
 

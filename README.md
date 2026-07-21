@@ -14,15 +14,19 @@ styles.css                    Shared styles
 404.html                      Not-found page
 music/index.html              Music category page
 music/tab-caster/index.html   Tab Caster utility (self-contained)
+music/scale-charts/index.html Scale Charts utility (self-contained)
 food/index.html               Food category page
 food/ice-cream-calculator/index.html   Ice Cream Calculator utility (self-contained)
 food/bakers-percentage/index.html      Baker's Percentage Calculator utility (self-contained)
 ```
 
-## Utilities
+## Music
 
 - **[Tab Caster](https://sebcarss.github.io/music/tab-caster)** — turn an
   Ultimate Guitar PDF into a single-screen tab you can cast to a TV.
+- **[Scale Charts](https://sebcarss.github.io/music/scale-charts)** — the notes
+  and chords for every scale degree in every key, with chord progressions
+  highlighted, sized to fill a TV.
 
 ## Food
 

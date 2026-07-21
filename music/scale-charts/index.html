@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scale Charts · Seb Carss</title>
+<meta name="description" content="Scale degree notes and chords for every key, with chord progression highlighting — built to cast to a TV.">
+<style>
+  :root {
+    --bg: #faf8f5;
+    --ink: #1b1d21;
+    --muted: #6b7076;
+    --line: rgba(0,0,0,.14);
+    --panel: #ffffff;
+    --bar: #1e2126;
+    --bar-text: #e8eaed;
+    --accent: #ff6d1f;
+    --hl-alpha: .16;
+    --hl-head: .82;
+  }
+  body.dark {
+    --bg: #14161a;
+    --ink: #eceef1;
+    --muted: #9aa1a9;
+    --line: rgba(255,255,255,.16);
+    --panel: #1b1e23;
+    --hl-alpha: .26;
+    --hl-head: .9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink);
+    overflow: hidden;
+  }
+
+  /* ---------- Toolbar ---------- */
+  #toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 14px;
+    background: var(--bar); color: var(--bar-text);
+    font-size: 13px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.35);
+    transition: transform .25s ease;
+    flex-wrap: wrap;
+  }
+  body.fs #toolbar { transform: translateY(-100%); }
+  body.fs.showbar #toolbar { transform: translateY(0); }
+  #toolbar .group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #toolbar label { opacity: .7; }
+  #toolbar button, #toolbar a, #toolbar select {
+    background: #33373e; color: var(--bar-text); border: none;
+    border-radius: 6px; padding: 5px 11px; font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  #toolbar button:hover, #toolbar a:hover, #toolbar select:hover { background: #43484f; }
+  #toolbar a { text-decoration: none; }
+  #toolbar button.active { background: var(--accent); color: #fff; }
+  #zoom { width: 110px; accent-color: var(--accent); }
+  #zoomVal { min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .spacer { flex: 1; }
+
+  /* ---------- Layout ---------- */
+  #main {
+    position: absolute; inset: 0; top: var(--barH, 44px);
+    display: flex; align-items: stretch;
+  }
+  body.fs #main { top: 0; }
+  #sheetWrap { flex: 1; min-width: 0; overflow: auto; padding: 10px 12px; }
+
+  /* ---------- Chart ---------- */
+  #chart {
+    border-collapse: separate; border-spacing: 0;
+    font-size: 20px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  #chart th, #chart td {
+    padding: .28em .55em; text-align: center;
+    border-bottom: 1px solid var(--line);
+    line-height: 1.15;
+  }
+  #chart thead th {
+    position: sticky; top: 0; z-index: 3;
+    background: var(--bg);
+    border-bottom: 2px solid var(--line);
+    padding-bottom: .35em;
+  }
+  #chart th.key, #chart thead th.corner {
+    position: sticky; left: 0; z-index: 2;
+    background: var(--bg); text-align: left;
+    border-right: 2px solid var(--line);
+    padding-right: .8em;
+  }
+  #chart thead th.corner { z-index: 4; }
+  .kname { font-weight: 700; font-size: 1.05em; }
+  .kscale { display: block; font-size: .42em; color: var(--muted);
+            text-transform: uppercase; letter-spacing: .09em; margin-top: .25em; }
+  .rom { font-weight: 700; font-size: .95em; }
+  .deg { display: block; font-size: .45em; color: var(--muted); margin-top: .3em;
+         letter-spacing: .06em; }
+  .note { font-weight: 700; }
+  .chord { display: block; font-size: .58em; color: var(--muted); margin-top: .2em; }
+  body.notes-only .chord, body.chords-only .note { display: none; }
+  /* pentatonic/blues scales have no diatonic chords — always show the notes */
+  body.chords-only.nochords .note { display: inline; }
+  body.chords-only .chord { font-size: 1em; color: var(--ink); font-weight: 700; margin-top: 0; }
+  #chart tbody tr:nth-child(even) td { background: rgba(128,128,128,.055); }
+  #chart tbody tr:hover td { background: rgba(128,128,128,.11); }
+  #chart th.key { cursor: pointer; }
+  #chart.hasSel tbody tr:not(.sel) { opacity: .3; }
+  #chart tbody tr.sel td, #chart tbody tr.sel th { background: rgba(128,128,128,.13); }
+  #chart tbody tr.sel th.key { box-shadow: inset .18em 0 0 var(--accent); }
+
+  /* highlighted progression degrees */
+  .hl { background: rgb(var(--c) / var(--hl-alpha)) !important; }
+  .hl .note, .hl .rom { color: rgb(var(--c)); }
+  body.dark .hl .note, body.dark .hl .rom { color: rgb(var(--c)); filter: brightness(1.35); }
+  .hl .chord { color: rgb(var(--c)); font-weight: 700; filter: brightness(1.1); }
+  #chart thead th.hl {
+    background: rgb(var(--c) / var(--hl-head)) !important;
+    border-radius: .3em .3em 0 0;
+  }
+  #chart thead th.hl .rom, #chart thead th.hl .deg { color: #fff; }
+  .step {
+    display: inline-block; margin-left: .35em; font-size: .42em; font-weight: 700;
+    vertical-align: super; color: rgb(var(--c)); letter-spacing: .05em;
+  }
+  #chart thead th.hl .step { color: #fff; }
+
+  /* ---------- Sidebar ---------- */
+  #side {
+    width: 300px; flex: none; overflow: auto;
+    background: var(--panel); border-left: 1px solid var(--line);
+    padding: 14px 14px 30px;
+  }
+  body.nosidebar #side { display: none; }
+  #side h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .1em;
+             color: var(--muted); margin: 18px 0 8px; font-weight: 700; }
+  #side h2:first-child { margin-top: 0; }
+  #progRow { display: flex; gap: 6px; }
+  #progInput {
+    flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink);
+  }
+  #progInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #clearBtn {
+    font: inherit; font-size: 13px; padding: 8px 10px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: transparent; color: var(--muted);
+  }
+  #clearBtn:hover { color: var(--ink); }
+  .hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  #legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  #legend span {
+    font-size: 14px; font-weight: 700; padding: 3px 9px; border-radius: 6px;
+    background: rgb(var(--c) / .18); color: rgb(var(--c));
+  }
+  body.dark #legend span { filter: brightness(1.3); }
+  .preset {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 9px;
+    background: transparent; color: inherit; font: inherit;
+    padding: 8px 10px; margin-bottom: 6px;
+  }
+  .preset:hover { border-color: var(--accent); }
+  .preset.on { border-color: var(--accent); background: rgba(255,109,31,.12); }
+  .preset .r { font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+  .preset .n { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .preset .a { float: right; font-size: 12px; color: var(--muted);
+               font-variant-numeric: tabular-nums; }
+
+  #toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: rgba(20,20,20,.85); color: #fff; padding: 9px 18px;
+    border-radius: 20px; font-size: 13px; z-index: 60; opacity: 0;
+    transition: opacity .3s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  @media (max-width: 700px) { #side { width: 240px; } }
+</style>
+</head>
+<body class="notes-and-chords">
+
+<div id="toolbar">
+  <div class="group">
+    <a href="/" title="Back to sebcarss.github.io">‹ Home</a>
+  </div>
+  <div class="group" id="scaleGroup"></div>
+  <div class="spacer"></div>
+  <div class="group">
+    <label>Show</label>
+    <button data-show="both" class="active">Both</button>
+    <button data-show="notes">Notes</button>
+    <button data-show="chords">Chords</button>
+  </div>
+  <div class="group">
+    <label>Size</label>
+    <input type="range" id="zoom" min="30" max="300" value="100">
+    <span id="zoomVal">100%</span>
+    <button id="fitBtn" title="Largest size that fits on screen (F)">Fit screen</button>
+  </div>
+  <div class="group">
+    <button id="sevBtn" title="Show four-note seventh chords (X)">7ths</button>
+    <button id="sideBtn" class="active" title="Show the progressions panel (S)">Panel</button>
+    <button id="darkBtn" title="Invert colours for TV (D)">Dark</button>
+    <button id="fsBtn" title="Full screen (Enter)">Full screen</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sheetWrap"><table id="chart"></table></div>
+  <aside id="side">
+    <h2>Chord progression</h2>
+    <div id="progRow">
+      <input id="progInput" placeholder="e.g. 1 4 5 or I V vi IV" autocomplete="off" spellcheck="false">
+      <button id="clearBtn" title="Clear (Esc)">Clear</button>
+    </div>
+    <div id="legend"></div>
+    <div class="hint">Type degrees as numbers (<b>1 4 5</b>) or Roman numerals
+      (<b>ii V I</b>). Click a key on the left of the chart to focus that row.</div>
+    <div id="presets"></div>
+  </aside>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ================= Music theory ================= */
+const LETTERS  = ['C','D','E','F','G','A','B'];
+const LETTER_PC = [0, 2, 4, 5, 7, 9, 11];
+
+// letterSteps: how many letter names each degree advances from the root.
+const SCALES = [
+  { id:'major',    name:'Major',           short:'major',       iv:[0,2,4,5,7,9,11], family:'major' },
+  { id:'minor',    name:'Natural Minor',   short:'nat. minor',  iv:[0,2,3,5,7,8,10], family:'minor' },
+  { id:'harmmin',  name:'Harmonic Minor',  short:'harm. minor', iv:[0,2,3,5,7,8,11], family:'minor' },
+  { id:'melmin',   name:'Melodic Minor',   short:'mel. minor',  iv:[0,2,3,5,7,9,11], family:'minor' },
+  { id:'dorian',   name:'Dorian',          short:'dorian',      iv:[0,2,3,5,7,9,10], family:'minor' },
+  { id:'phrygian', name:'Phrygian',        short:'phrygian',    iv:[0,1,3,5,7,8,10], family:'minor' },
+  { id:'lydian',   name:'Lydian',          short:'lydian',      iv:[0,2,4,6,7,9,11], family:'major' },
+  { id:'mixo',     name:'Mixolydian',      short:'mixolydian',  iv:[0,2,4,5,7,9,10], family:'major' },
+  { id:'locrian',  name:'Locrian',         short:'locrian',     iv:[0,1,3,5,6,8,10], family:'minor' },
+  { id:'majpent',  name:'Major Pentatonic',short:'maj. pent.',  iv:[0,2,4,7,9],      family:'major',
+    letterSteps:[0,1,2,4,5], degLabels:['1','2','3','5','6'] },
+  { id:'minpent',  name:'Minor Pentatonic',short:'min. pent.',  iv:[0,3,5,7,10],     family:'minor',
+    letterSteps:[0,2,3,4,6], degLabels:['1','♭3','4','5','♭7'] },
+  { id:'blues',    name:'Blues',           short:'blues',       iv:[0,3,5,6,7,10],   family:'minor',
+    letterSteps:[0,2,3,4,4,6], degLabels:['1','♭3','4','♭5','5','♭7'] }
+];
+const ROMAN = ['I','II','III','IV','V','VI','VII'];
+
+// Candidate spellings for each pitch class; the one giving the fewest
+// accidentals across the whole scale wins, so we never print C𝄪 unnecessarily.
+const ROOT_CANDIDATES = [
+  ['C'], ['Db','C#'], ['D'], ['Eb','D#'], ['E'], ['F'],
+  ['Gb','F#'], ['G'], ['Ab','G#'], ['A'], ['Bb','A#'], ['B']
+];
+
+function parseName(n) {
+  let acc = 0;
+  for (const ch of n.slice(1)) { if (ch === '#') acc++; else if (ch === 'b') acc--; }
+  return { li: LETTERS.indexOf(n[0]), acc };
+}
+function accText(a) { return a > 0 ? '♯'.repeat(a) : a < 0 ? '♭'.repeat(-a) : ''; }
+function spell(li, acc) { return LETTERS[li % 7] + accText(acc); }
+
+// Notes of `scale` from a root, spelled so each degree uses its own letter name.
+function scaleNotes(rootName, scale) {
+  const r = parseName(rootName);
+  const rootPc = ((LETTER_PC[r.li] + r.acc) % 12 + 12) % 12;
+  const steps = scale.letterSteps || scale.iv.map((_, i) => i);
+  return scale.iv.map((semi, i) => {
+    const li = (r.li + steps[i]) % 7;
+    const want = (rootPc + semi) % 12;
+    let d = ((want - LETTER_PC[li]) % 12 + 12) % 12;
+    if (d > 6) d -= 12;
+    return { li, acc: d, name: spell(li, d), pc: want };
+  });
+}
+
+function pickRoots(scale) {
+  return ROOT_CANDIDATES.map(cands => {
+    let best = null, bestScore = Infinity;
+    for (const c of cands) {
+      const score = scaleNotes(c, scale)
+        .reduce((s, n) => s + Math.abs(n.acc) + (Math.abs(n.acc) > 1 ? 10 : 0), 0);
+      if (score < bestScore) { bestScore = score; best = c; }
+    }
+    return best;
+  });
+}
+
+// Triad / seventh built by stacking scale degrees in thirds.
+function chordAt(scale, i, sevenths) {
+  const n = scale.iv.length;
+  const ext = j => scale.iv[j % n] + 12 * Math.floor(j / n);
+  const root = ext(i);
+  const third = ext(i + 2) - root, fifth = ext(i + 4) - root;
+  let quality, suffix;
+  if (third === 4 && fifth === 7)      { quality = 'maj'; suffix = ''; }
+  else if (third === 3 && fifth === 7) { quality = 'min'; suffix = 'm'; }
+  else if (third === 3 && fifth === 6) { quality = 'dim'; suffix = '°'; }
+  else if (third === 4 && fifth === 8) { quality = 'aug'; suffix = '+'; }
+  else if (third === 5 && fifth === 7) { quality = 'sus'; suffix = 'sus4'; }
+  else if (third === 2 && fifth === 7) { quality = 'sus'; suffix = 'sus2'; }
+  else                                 { quality = 'other'; suffix = '?'; }
+
+  if (sevenths && quality !== 'other' && quality !== 'sus') {
+    const sev = ext(i + 6) - root;
+    if (quality === 'maj')      suffix = sev === 11 ? 'maj7' : sev === 10 ? '7' : suffix + '(add' + sev + ')';
+    else if (quality === 'min') suffix = sev === 10 ? 'm7' : sev === 11 ? 'mMaj7' : suffix;
+    else if (quality === 'dim') suffix = sev === 9 ? '°7' : sev === 10 ? 'm7♭5' : suffix;
+    else if (quality === 'aug') suffix = sev === 11 ? 'maj7♯5' : sev === 10 ? '7♯5' : suffix;
+  }
+  return { quality, suffix };
+}
+
+function romanFor(scale, i, sevenths) {
+  if (scale.degLabels) return scale.degLabels[i];
+  const n = scale.iv.length;
+  const ext = j => scale.iv[j % n] + 12 * Math.floor(j / n);
+  const { quality } = chordAt(scale, i, false);
+  const minorish = quality === 'min' || quality === 'dim';
+  let sym = minorish ? ROMAN[i].toLowerCase() : ROMAN[i];
+  if (quality === 'dim') sym += '°';
+  else if (quality === 'aug') sym += '+';
+  else if (quality === 'sus') sym += 'sus';
+  if (!sevenths) return sym;
+
+  const sev = ext(i + 6) - ext(i);
+  if (quality === 'dim')      sym = ROMAN[i].toLowerCase() + (sev === 9 ? '°7' : 'ø7');
+  else if (quality === 'maj') sym += (sev === 11 ? 'maj7' : '7');
+  else if (quality === 'min') sym += (sev === 11 ? '(maj7)' : '7');
+  else if (quality === 'aug') sym += (sev === 11 ? 'maj7' : '7');
+  return sym;
+}
+
+/* ================= Progressions ================= */
+const STEP_COLOURS = ['255 109 31', '47 126 240', '23 160 106', '155 81 224', '224 81 140', '10 165 181'];
+
+const PRESETS = [
+  { g:'Major-key', r:'I – V – vi – IV', d:[1,5,6,4], n:'Pop / “Axis” progression' },
+  { g:'Major-key', r:'I – IV – V',      d:[1,4,5],   n:'Classic rock, blues & folk' },
+  { g:'Major-key', r:'I – vi – IV – V', d:[1,6,4,5], n:'50s doo-wop' },
+  { g:'Major-key', r:'vi – IV – I – V', d:[6,4,1,5], n:'Pop ballad (Axis, minor start)' },
+  { g:'Major-key', r:'ii – V – I',      d:[2,5,1],   n:'Jazz cadence' },
+  { g:'Major-key', r:'I – vi – ii – V', d:[1,6,2,5], n:'Jazz turnaround' },
+  { g:'Major-key', r:'I – IV – vi – V', d:[1,4,6,5], n:'Modern pop' },
+  { g:'Major-key', r:'I – iii – IV – V',d:[1,3,4,5], n:'Doo-wop variant' },
+  { g:'Major-key', r:'I – V – vi – iii – IV – I – IV – V', d:[1,5,6,3,4,1,4,5], n:'Pachelbel’s canon' },
+  { g:'Minor-key', r:'i – VI – III – VII', d:[1,6,3,7], n:'Minor “Axis” / epic' },
+  { g:'Minor-key', r:'i – iv – v',      d:[1,4,5],   n:'Minor blues & folk' },
+  { g:'Minor-key', r:'i – VII – VI – VII', d:[1,7,6,7], n:'Minor rock vamp' },
+  { g:'Minor-key', r:'i – VII – VI – V',d:[1,7,6,5], n:'Andalusian cadence (harmonic minor)' },
+  { g:'Minor-key', r:'ii° – V – i',     d:[2,5,1],   n:'Minor jazz cadence (harmonic minor)' },
+  { g:'Minor-key', r:'i – iv – VII – III', d:[1,4,7,3], n:'Minor circle' },
+  { g:'Minor-key', r:'i – VI – VII',    d:[1,6,7],   n:'Epic minor climb' }
+];
+
+const ROMAN_LOOKUP = { i:1, ii:2, iii:3, iv:4, v:5, vi:6, vii:7 };
+function parseProgression(text) {
+  const out = [];
+  for (const raw of text.split(/[^A-Za-z0-9#♭♯°+♯]+/)) {
+    if (!raw) continue;
+    const t = raw.replace(/[°+♭♯#b]/g, '');
+    if (/^[1-7]$/.test(t)) { out.push(+t); continue; }
+    const key = t.toLowerCase();
+    if (ROMAN_LOOKUP[key]) out.push(ROMAN_LOOKUP[key]);
+  }
+  return out;
+}
+
+/* ================= State & rendering ================= */
+let scale = SCALES[0];
+let sevenths = false;
+let progression = [];
+let baseFs = 20, zoom = 1, autoFit = true;
+
+function render() {
+  document.body.classList.toggle('nochords', !!scale.degLabels);
+  const roots = pickRoots(scale);
+  const n = scale.iv.length;
+  const t = $('chart');
+
+  // degree -> ordered list of 1-based positions in the progression
+  const steps = new Map();
+  progression.forEach((d, i) => {
+    if (d > n) return;
+    if (!steps.has(d)) steps.set(d, []);
+    steps.get(d).push(i + 1);
+  });
+  const colourOf = d => STEP_COLOURS[(steps.get(d)[0] - 1) % STEP_COLOURS.length];
+
+  let head = '<thead><tr><th class="corner">Key</th>';
+  for (let i = 0; i < n; i++) {
+    const d = i + 1, on = steps.has(d);
+    const style = on ? ` style="--c:${colourOf(d)}"` : '';
+    const badge = on ? `<span class="step">${steps.get(d).join('·')}</span>` : '';
+    head += `<th class="${on ? 'hl' : ''}"${style}>` +
+            `<span class="rom">${romanFor(scale, i, sevenths)}</span>${badge}` +
+            `<span class="deg">${scale.degLabels ? 'degree ' + d : d}</span></th>`;
+  }
+  head += '</tr></thead>';
+
+  let body = '<tbody>';
+  for (const root of roots) {
+    const notes = scaleNotes(root, scale);
+    body += `<tr><th class="key" data-key="${root}">` +
+            `<span class="kname">${spell(parseName(root).li, parseName(root).acc)}</span>` +
+            `<span class="kscale">${scale.short}</span></th>`;
+    notes.forEach((note, i) => {
+      const d = i + 1, on = steps.has(d);
+      const style = on ? ` style="--c:${colourOf(d)}"` : '';
+      const chord = scale.degLabels ? '' :
+        `<span class="chord">${note.name}${chordAt(scale, i, sevenths).suffix}</span>`;
+      body += `<td class="${on ? 'hl' : ''}"${style}>` +
+              `<span class="note">${note.name}</span>${chord}</td>`;
+    });
+    body += '</tr>';
+  }
+  body += '</tbody>';
+
+  const sel = t.querySelector('tr.sel th.key')?.dataset.key;
+  t.innerHTML = head + body;
+  if (sel) {
+    const th = t.querySelector(`th.key[data-key="${CSS.escape(sel)}"]`);
+    if (th) { th.parentElement.classList.add('sel'); t.classList.add('hasSel'); }
+  }
+  renderLegend();
+  if (autoFit) fit(); else applyZoom();
+}
+
+function renderLegend() {
+  const n = scale.iv.length;
+  $('legend').innerHTML = progression.map((d, i) => {
+    if (d > n) return `<span style="--c:150 150 150">?</span>`;
+    return `<span style="--c:${STEP_COLOURS[i % STEP_COLOURS.length]}">` +
+           `${romanFor(scale, d - 1, sevenths)}</span>`;
+  }).join('');
+  const over = progression.some(d => d > n);
+  if (over) $('legend').innerHTML +=
+    `<span style="--c:150 150 150;font-size:11px;font-weight:400">` +
+    `only ${n} degrees in this scale</span>`;
+}
+
+/* ================= Sizing ================= */
+function fit() {
+  const wrap = $('sheetWrap'), t = $('chart');
+  t.style.fontSize = '20px';
+  const w = t.scrollWidth, h = t.scrollHeight;
+  if (!w || !h) return;
+  const fs = 20 * Math.min((wrap.clientWidth - 26) / w, (wrap.clientHeight - 22) / h);
+  baseFs = Math.max(7, Math.min(90, fs));
+  zoom = 1;
+  applyZoom();
+}
+function applyZoom() {
+  $('chart').style.fontSize = (baseFs * zoom) + 'px';
+  $('zoom').value = Math.round(zoom * 100);
+  $('zoomVal').textContent = Math.round(zoom * 100) + '%';
+}
+function setZoom(z) { zoom = Math.max(0.3, Math.min(3, z)); autoFit = false; applyZoom(); }
+
+/* ================= Controls ================= */
+$('scaleGroup').innerHTML = SCALES
+  .map((s, i) => `<button data-scale="${s.id}"${i ? '' : ' class="active"'}>${s.name}</button>`)
+  .join('');
+$('scaleGroup').addEventListener('click', e => {
+  const b = e.target.closest('button[data-scale]');
+  if (!b) return;
+  setScale(SCALES.findIndex(s => s.id === b.dataset.scale));
+});
+function setScale(i) {
+  scale = SCALES[(i + SCALES.length) % SCALES.length];
+  $('scaleGroup').querySelectorAll('button').forEach(b =>
+    b.classList.toggle('active', b.dataset.scale === scale.id));
+  autoFit = true;
+  render();
+  toast(scale.name);
+}
+
+document.querySelectorAll('#toolbar button[data-show]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#toolbar button[data-show]').forEach(o =>
+      o.classList.toggle('active', o === b));
+    document.body.classList.toggle('notes-only', b.dataset.show === 'notes');
+    document.body.classList.toggle('chords-only', b.dataset.show === 'chords');
+    autoFit = true; fit();
+  });
+});
+
+$('sevBtn').addEventListener('click', () => {
+  sevenths = !sevenths;
+  $('sevBtn').classList.toggle('active', sevenths);
+  autoFit = true; render();
+});
+$('sideBtn').addEventListener('click', () => {
+  document.body.classList.toggle('nosidebar');
+  $('sideBtn').classList.toggle('active', !document.body.classList.contains('nosidebar'));
+  autoFit = true; fit();
+});
+$('darkBtn').addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+  $('darkBtn').classList.toggle('active');
+});
+$('fitBtn').addEventListener('click', () => { autoFit = true; fit(); });
+$('zoom').addEventListener('input', e => setZoom(+e.target.value / 100));
+
+function toggleFS() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
+}
+$('fsBtn').addEventListener('click', toggleFS);
+document.addEventListener('fullscreenchange', () => {
+  document.body.classList.toggle('fs', !!document.fullscreenElement);
+  if (autoFit) fit();
+  if (document.fullscreenElement)
+    toast('Move mouse to the top for controls · Esc to exit', 3000);
+});
+document.addEventListener('mousemove', e => {
+  if (!document.body.classList.contains('fs')) return;
+  document.body.classList.toggle('showbar', e.clientY < 60);
+});
+
+// click a key to focus its row
+$('chart').addEventListener('click', e => {
+  const th = e.target.closest('th.key');
+  if (!th) return;
+  const tr = th.parentElement, was = tr.classList.contains('sel');
+  $('chart').querySelectorAll('tr.sel').forEach(r => r.classList.remove('sel'));
+  tr.classList.toggle('sel', !was);
+  $('chart').classList.toggle('hasSel', !was);
+});
+
+/* ---------- Progression input & presets ---------- */
+function setProgression(list, text) {
+  progression = list;
+  $('progInput').value = text ?? list.join(' ');
+  const key = list.join(' ');
+  document.querySelectorAll('.preset').forEach(p =>
+    p.classList.toggle('on', p.dataset.d === key));
+  render();
+}
+$('progInput').addEventListener('input', e => {
+  progression = parseProgression(e.target.value);
+  const key = progression.join(' ');
+  document.querySelectorAll('.preset').forEach(p =>
+    p.classList.toggle('on', p.dataset.d === key));
+  render();
+});
+$('clearBtn').addEventListener('click', () => setProgression([], ''));
+
+let html = '', group = '';
+for (const p of PRESETS) {
+  if (p.g !== group) { group = p.g; html += `<h2>${group} progressions</h2>`; }
+  html += `<button class="preset" data-d="${p.d.join(' ')}">` +
+          `<span class="a">${p.d.join('–')}</span>` +
+          `<span class="r">${p.r}</span><span class="n">${p.n}</span></button>`;
+}
+$('presets').innerHTML = html;
+$('presets').addEventListener('click', e => {
+  const b = e.target.closest('.preset');
+  if (!b) return;
+  const list = b.dataset.d.split(' ').map(Number);
+  setProgression(list, list.join(' '));
+});
+
+/* ---------- Keyboard ---------- */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'range') {
+    if (e.key === 'Escape') { e.target.blur(); setProgression([], ''); }
+    return;
+  }
+  const k = e.key.toLowerCase();
+  if (k === 'd') $('darkBtn').click();
+  else if (k === 'f') { autoFit = true; fit(); }
+  else if (k === 's') $('sideBtn').click();
+  else if (k === 'x') $('sevBtn').click();
+  else if (k === 'enter') toggleFS();
+  else if (k === 'escape') setProgression([], '');
+  else if (k === 'arrowright' || k === ']') { e.preventDefault(); setScale(SCALES.indexOf(scale) + 1); }
+  else if (k === 'arrowleft' || k === '[') { e.preventDefault(); setScale(SCALES.indexOf(scale) - 1); }
+  else if (k === '+' || k === '=') setZoom(zoom + 0.05);
+  else if (k === '-') setZoom(zoom - 0.05);
+  else if (k >= '1' && k <= '7') {
+    const d = +k, i = progression.indexOf(d);
+    if (i >= 0) progression.splice(i, 1); else progression.push(d);
+    setProgression(progression.slice());
+  }
+});
+
+let toastT;
+function toast(msg, ms = 1600) {
+  const el = $('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+/* ---------- Init ---------- */
+const ro = new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--barH', $('toolbar').offsetHeight + 'px');
+  if (autoFit) fit();
+});
+ro.observe($('toolbar'));
+window.addEventListener('resize', () => { if (autoFit) fit(); });
+
+if (window.matchMedia('(prefers-color-scheme: dark)').matches) $('darkBtn').click();
+render();
+</script>
+</body>
+</html>
