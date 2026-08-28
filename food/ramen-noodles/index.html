@@ -1,0 +1,2242 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ramen Noodle Calculator · Seb Carss</title>
+    <meta
+      name="description"
+      content="Design ramen noodles: flour blend, hydration, kansui, egg, cut number and crimp — then see which regional style, from Hakata to Kitakata, the noodle actually fits."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+
+      .rnc-grid {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 1.5rem;
+        align-items: start;
+      }
+
+      @media (max-width: 760px) {
+        .rnc-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .rnc-panel {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.1rem 1.25rem;
+        background: var(--surface);
+      }
+
+      .rnc-panel h2 {
+        margin: 0 0 0.75rem;
+        font-size: 1.1rem;
+      }
+
+      .rnc-panel h3 {
+        margin: 1.1rem 0 0.35rem;
+        font-size: 0.95rem;
+      }
+
+      .rnc-panel + .rnc-panel {
+        margin-top: 1.5rem;
+      }
+
+      /* Mode toggle */
+      .rnc-toggle {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 0.85rem;
+      }
+
+      .rnc-toggle button {
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: 0.9rem;
+        color: var(--muted);
+        padding: 0.35rem 1rem;
+        cursor: pointer;
+      }
+
+      .rnc-toggle button[aria-pressed="true"] {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* Tables of rows */
+      .rnc-rows {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      .rnc-rows th {
+        text-align: left;
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 0.85rem;
+        padding: 0 0.5rem 0.35rem 0;
+      }
+
+      .rnc-rows td {
+        padding: 0.25rem 0.5rem 0.25rem 0;
+        vertical-align: middle;
+      }
+
+      .rnc-rows td:last-child,
+      .rnc-rows th:last-child {
+        padding-right: 0;
+      }
+
+      .rnc-rows input[type="text"],
+      .rnc-rows input[type="number"],
+      .rnc-rows select,
+      .rnc-mode-inputs input,
+      .rnc-params input,
+      .rnc-params select {
+        width: 100%;
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.35rem 0.5rem;
+      }
+
+      .rnc-rows input[type="number"],
+      .rnc-mode-inputs input {
+        max-width: 5.6rem;
+        text-align: right;
+      }
+
+      /* Browsers overlay the number spinner on top of the right-hand padding,
+         which clips three- and four-digit values in cells this narrow. Arrow
+         keys still step the value. */
+      .rnc-rows input[type="number"],
+      .rnc-mode-inputs input[type="number"],
+      .rnc-params input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+
+      .rnc-rows input[type="number"]::-webkit-outer-spin-button,
+      .rnc-rows input[type="number"]::-webkit-inner-spin-button,
+      .rnc-mode-inputs input[type="number"]::-webkit-outer-spin-button,
+      .rnc-mode-inputs input[type="number"]::-webkit-inner-spin-button,
+      .rnc-params input[type="number"]::-webkit-outer-spin-button,
+      .rnc-params input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+
+      .rnc-rows select {
+        max-width: 9.5rem;
+        font-size: 0.9rem;
+      }
+
+      /* The flour blend carries six columns, so it gets tighter inputs than
+         the four-column dough table. */
+      .rnc-rows-tight input[type="number"] {
+        max-width: 4.2rem;
+      }
+
+      .rnc-rows-tight select {
+        max-width: 9.5rem;
+      }
+
+      /* The dough table's trailing hint column must be allowed to wrap, or its
+         nowrap text pushes the two input columns narrow again. */
+      .rnc-rows-hint td:last-child {
+        white-space: normal;
+        font-size: 0.8rem;
+        line-height: 1.25;
+      }
+
+      .rnc-rows input:disabled,
+      .rnc-rows input[readonly] {
+        background: #f9fafb;
+        color: var(--muted);
+      }
+
+      .rnc-mode-inputs,
+      .rnc-params {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: end;
+        margin-bottom: 1rem;
+      }
+
+      .rnc-params {
+        margin: 0.5rem 0 0.75rem;
+      }
+
+      .rnc-mode-inputs label,
+      .rnc-params label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .rnc-params input[type="number"] {
+        width: 5.5rem;
+        text-align: right;
+      }
+
+      .rnc-params input[type="range"] {
+        width: 8rem;
+        padding: 0;
+        border: 0;
+        background: none;
+      }
+
+      .rnc-grams {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .rnc-remove {
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.25rem;
+      }
+
+      .rnc-remove:hover {
+        color: #dc2626;
+      }
+
+      .rnc-total-row td {
+        border-top: 1px solid var(--border);
+        padding-top: 0.5rem;
+        font-weight: 600;
+      }
+
+      .rnc-btn {
+        font: inherit;
+        font-size: 0.9rem;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.9rem;
+        cursor: pointer;
+      }
+
+      .rnc-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .rnc-btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .rnc-btn-primary:hover {
+        color: #fff;
+        opacity: 0.9;
+      }
+
+      .rnc-actions {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .rnc-warn {
+        color: #b45309;
+        font-size: 0.85rem;
+        margin: 0.5rem 0 0;
+      }
+
+      .rnc-note {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin: 0.5rem 0 0;
+      }
+
+      /* Guidance meters */
+      .rnc-metric {
+        padding: 0.55rem 0;
+      }
+
+      .rnc-metric + .rnc-metric {
+        border-top: 1px solid var(--border);
+      }
+
+      .rnc-metric-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+      }
+
+      .rnc-value {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+
+      .rnc-value.ok {
+        color: #15803d;
+      }
+
+      .rnc-value.off {
+        color: #b45309;
+      }
+
+      .rnc-meter {
+        position: relative;
+        height: 10px;
+        margin-top: 0.4rem;
+        border-radius: 5px;
+        background: #f3f4f6;
+        overflow: hidden;
+      }
+
+      .rnc-meter .band {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        background: var(--accent-soft);
+      }
+
+      .rnc-meter .band.alt {
+        background: #dbeafe;
+      }
+
+      .rnc-meter .band.target {
+        border-left: 1px solid var(--accent);
+        border-right: 1px solid var(--accent);
+      }
+
+      .rnc-meter .marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        border-radius: 2px;
+        background: var(--text);
+      }
+
+      .rnc-scale {
+        position: relative;
+        height: 1rem;
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+
+      .rnc-scale span {
+        position: absolute;
+        transform: translateX(-50%);
+      }
+
+      .rnc-verdict {
+        font-size: 0.9rem;
+        margin: 0.35rem 0 0;
+      }
+
+      .rnc-guide-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+
+      .rnc-guide-table td {
+        padding: 0.2rem 0.5rem 0.2rem 0;
+        vertical-align: top;
+      }
+
+      .rnc-guide-table td:first-child {
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .rnc-guide-table td:last-child {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .rnc-guide-table.left td:last-child {
+        text-align: left;
+        font-variant-numeric: normal;
+      }
+
+      /* Noodle preview */
+      .rnc-preview {
+        margin-top: 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fafafa;
+      }
+
+      .rnc-preview svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .rnc-swatch {
+        display: inline-block;
+        width: 2.6rem;
+        height: 1.1rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        vertical-align: -0.2rem;
+      }
+
+      /* Texture bars */
+      .rnc-tex {
+        display: grid;
+        grid-template-columns: 6.5rem 1fr 2.4rem;
+        gap: 0.4rem 0.5rem;
+        align-items: center;
+        font-size: 0.85rem;
+        margin-top: 0.4rem;
+      }
+
+      .rnc-tex .label {
+        color: var(--muted);
+      }
+
+      .rnc-tex .track {
+        height: 8px;
+        border-radius: 4px;
+        background: #f3f4f6;
+        overflow: hidden;
+      }
+
+      .rnc-tex .fill {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 4px;
+      }
+
+      .rnc-tex .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Style match */
+      .rnc-delta {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 0.6rem;
+      }
+
+      .rnc-delta th {
+        text-align: left;
+        color: var(--muted);
+        font-weight: 500;
+        padding: 0 0.4rem 0.3rem 0;
+      }
+
+      .rnc-delta td {
+        padding: 0.25rem 0.4rem 0.25rem 0;
+        border-top: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      .rnc-delta td:nth-child(2) {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .rnc-delta td:last-child {
+        color: var(--muted);
+        white-space: nowrap;
+        padding-right: 0;
+      }
+
+      .rnc-delta .ok {
+        color: #15803d;
+      }
+
+      .rnc-delta .off {
+        color: #b45309;
+      }
+
+      .rnc-rank {
+        list-style: none;
+        margin: 0.6rem 0 0;
+        padding: 0;
+      }
+
+      .rnc-rank li {
+        padding: 0.4rem 0;
+      }
+
+      .rnc-rank li + li {
+        border-top: 1px solid var(--border);
+      }
+
+      .rnc-rank .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+      }
+
+      .rnc-rank .pct {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+
+      .rnc-rank .track {
+        height: 6px;
+        border-radius: 3px;
+        background: #f3f4f6;
+        margin-top: 0.25rem;
+        overflow: hidden;
+      }
+
+      .rnc-rank .fill {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 3px;
+      }
+
+      .rnc-rank .why {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-top: 0.2rem;
+      }
+
+      /* Saved recipes list */
+      .rnc-save-form {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .rnc-save-form input[type="text"] {
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.6rem;
+      }
+
+      .rnc-list {
+        list-style: none;
+        margin: 0.75rem 0 0;
+        padding: 0;
+      }
+
+      .rnc-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.4rem 0;
+        border-top: 1px solid var(--border);
+        font-size: 0.95rem;
+      }
+
+      .rnc-list .meta {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .rnc-list .btns {
+        display: flex;
+        gap: 0.4rem;
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="/">Seb Carss</a>
+        <nav class="nav-links">
+          <a href="/">Home</a>
+          <a href="/music/">Music</a>
+          <a href="/food/" aria-current="page">Food</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <h1><span aria-hidden="true">🍜</span> Ramen Noodle Calculator</h1>
+        <p>
+          A ramen noodle is its dough <em>and</em> its cut. Build a flour blend,
+          set hydration, kansui and egg, pick a cut number and crimp — then see
+          which of twenty-two regional styles you've actually made.
+        </p>
+      </section>
+
+      <div class="rnc-grid">
+        <div>
+          <section class="rnc-panel">
+            <h2>Batch</h2>
+
+            <div class="rnc-toggle" role="group" aria-label="Scaling mode">
+              <button type="button" id="mode-flour" aria-pressed="true">Flour weight</button>
+              <button type="button" id="mode-target" aria-pressed="false">Target yield</button>
+            </div>
+
+            <div class="rnc-mode-inputs" id="flour-inputs">
+              <label>Flour g
+                <input type="number" id="flour-grams" min="0" step="50" value="1000" />
+              </label>
+              <label>g per serving
+                <input type="number" id="serving-g" min="1" step="10" value="120" />
+              </label>
+              <label>Waste %
+                <input type="number" id="waste" min="0" max="30" step="1" value="6" />
+              </label>
+            </div>
+            <div class="rnc-mode-inputs" id="target-inputs" hidden>
+              <label>Servings
+                <input type="number" id="servings" min="1" step="1" value="8" />
+              </label>
+              <span class="rnc-note" id="target-flour-note"></span>
+            </div>
+            <p class="rnc-note">
+              Waste covers the trim and the shaggy ends lost to sheeting.
+              Dusting starch (<em>uchiko</em>) sits outside the formula — it
+              never counts toward the percentages.
+            </p>
+
+            <h3>Flour blend <span class="rnc-note" style="font-weight: 400">(shares of the 100%)</span></h3>
+            <table class="rnc-rows rnc-rows-tight">
+              <thead>
+                <tr>
+                  <th>Flour</th>
+                  <th>Share %</th>
+                  <th>Protein %</th>
+                  <th>Ash %</th>
+                  <th>Grams</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="flour-rows"></tbody>
+              <tfoot>
+                <tr class="rnc-total-row">
+                  <td>Blend</td>
+                  <td id="share-total" class="rnc-grams"></td>
+                  <td id="blend-protein" class="rnc-grams"></td>
+                  <td id="blend-ash" class="rnc-grams"></td>
+                  <td id="flour-total"></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+            <div class="rnc-actions">
+              <button type="button" class="rnc-btn" id="add-flour">+ Add flour</button>
+            </div>
+            <p class="rnc-warn" id="blend-warn" hidden></p>
+            <p class="rnc-note">
+              Vital wheat gluten and starches belong in this table — they shift
+              the blend's protein up or down, which is what the styles are
+              scored against.
+            </p>
+
+            <h3>Add a custom flour</h3>
+            <form class="rnc-params" id="flour-form">
+              <label>Name
+                <input type="text" id="nf-name" required placeholder="e.g. Nisshin Camellia" />
+              </label>
+              <label>Protein %
+                <input type="number" id="nf-protein" min="0" max="100" step="0.1" required />
+              </label>
+              <label>Ash %
+                <input type="number" id="nf-ash" min="0" max="5" step="0.05" value="0.45" />
+              </label>
+              <button type="submit" class="rnc-btn">Add</button>
+            </form>
+            <ul class="rnc-list" id="flour-list"></ul>
+          </section>
+
+          <section class="rnc-panel">
+            <h2>Dough</h2>
+
+            <div class="rnc-params">
+              <label>Kansui form
+                <select id="kansui-form">
+                  <option value="none">None</option>
+                  <option value="powder" selected>Powdered kansui</option>
+                  <option value="liquid">Liquid kansui</option>
+                  <option value="baked">Baked baking soda</option>
+                  <option value="bicarb">Sodium bicarbonate</option>
+                </select>
+              </label>
+              <label id="kansui-conc-label" hidden>Solution strength %
+                <input type="number" id="kansui-conc" min="1" max="100" step="1" value="30" />
+              </label>
+              <label id="kansui-ratio-label">K₂CO₃ share % <span id="kansui-ratio-out"></span>
+                <input type="range" id="kansui-ratio" min="0" max="100" step="5" value="90" />
+              </label>
+              <label>Egg form
+                <select id="egg-form">
+                  <option value="none" selected>None</option>
+                  <option value="whole">Whole egg</option>
+                  <option value="yolk">Yolk only</option>
+                  <option value="dried">Dried yolk powder</option>
+                </select>
+              </label>
+              <label>Aging h
+                <input type="number" id="aging" min="0" max="168" step="1" value="12" />
+              </label>
+            </div>
+
+            <table class="rnc-rows rnc-rows-hint">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>% of flour</th>
+                  <th>Grams</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Water</td>
+                  <td><input type="number" id="water-pct" min="0" step="0.5" value="35" aria-label="Water percent" /></td>
+                  <td><input type="number" id="water-g" min="0" step="5" aria-label="Water grams" /></td>
+                  <td class="rnc-grams" id="water-note"></td>
+                </tr>
+                <tr>
+                  <td>Salt</td>
+                  <td><input type="number" id="salt-pct" min="0" step="0.1" value="1.5" aria-label="Salt percent" /></td>
+                  <td><input type="number" id="salt-g" min="0" step="0.5" aria-label="Salt grams" /></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td id="kansui-label">Kansui</td>
+                  <td><input type="number" id="kansui-pct" min="0" step="0.05" value="1" aria-label="Kansui percent" /></td>
+                  <td><input type="number" id="kansui-g" min="0" step="0.5" aria-label="Kansui grams" /></td>
+                  <td class="rnc-grams" id="kansui-eq"></td>
+                </tr>
+                <tr id="egg-row">
+                  <td id="egg-label">Egg</td>
+                  <td><input type="number" id="egg-pct" min="0" step="0.5" value="0" aria-label="Egg percent" /></td>
+                  <td><input type="number" id="egg-g" min="0" step="1" aria-label="Egg grams" /></td>
+                  <td class="rnc-grams" id="egg-note"></td>
+                </tr>
+                <tr>
+                  <td>Colourant</td>
+                  <td><input type="number" id="colour-pct" min="0" step="0.01" value="0" aria-label="Colourant percent" /></td>
+                  <td><input type="number" id="colour-g" min="0" step="0.1" aria-label="Colourant grams" /></td>
+                  <td class="rnc-grams">turmeric / gardenia</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="rnc-total-row">
+                  <td>Total dough</td>
+                  <td id="total-pct" class="rnc-grams"></td>
+                  <td id="total-g"></td>
+                  <td class="rnc-grams" id="yield-note"></td>
+                </tr>
+              </tfoot>
+            </table>
+            <p class="rnc-note" id="kansui-note"></p>
+            <p class="rnc-warn" id="dough-warn" hidden></p>
+          </section>
+
+          <section class="rnc-panel">
+            <h2>Cut</h2>
+            <div class="rnc-params">
+              <label>Cut number (番手)
+                <select id="cut"></select>
+              </label>
+              <label>Thickness mm
+                <input type="number" id="thickness-num" min="0.6" max="4" step="0.05" value="1.25" />
+              </label>
+              <label>&nbsp;
+                <input type="range" id="thickness" min="0.6" max="4" step="0.05" value="1.25" aria-label="Thickness slider" />
+              </label>
+              <label>Crimp
+                <select id="crimp"></select>
+              </label>
+            </div>
+            <p class="rnc-note">
+              Cut number is how many blades divide 30 mm, so a higher number is
+              a <em>thinner</em> noodle: width = 30 ÷ n. Thickness is set
+              independently by the final roller gap — the ratio of the two is
+              what makes a noodle square, flat or wide.
+            </p>
+
+            <table class="rnc-guide-table" id="geom-table"></table>
+
+            <div class="rnc-preview">
+              <svg id="xsec" viewBox="0 0 300 110" role="img" aria-label="Noodle cross-section, to scale"></svg>
+            </div>
+            <p class="rnc-note" id="xsec-note"></p>
+
+            <div class="rnc-preview">
+              <svg id="crimp-svg" viewBox="0 0 300 72" role="img" aria-label="Noodle crimp profile"></svg>
+            </div>
+          </section>
+
+          <section class="rnc-panel">
+            <h2>Saved recipes</h2>
+            <div class="rnc-save-form">
+              <input type="text" id="recipe-name" placeholder="Recipe name" aria-label="Recipe name" />
+              <button type="button" class="rnc-btn rnc-btn-primary" id="save-recipe">Save</button>
+            </div>
+            <ul class="rnc-list" id="recipe-list"></ul>
+            <p class="rnc-note">Recipes are saved in this browser only.</p>
+          </section>
+        </div>
+
+        <div>
+          <section class="rnc-panel">
+            <h2>Analysis</h2>
+
+            <div class="rnc-metric">
+              <div class="rnc-metric-head">
+                <span>Effective hydration</span>
+                <span class="rnc-value" id="hyd-value">–</span>
+              </div>
+              <div class="rnc-meter" id="hyd-meter"></div>
+              <div class="rnc-scale" id="hyd-scale"></div>
+              <p class="rnc-verdict" id="hyd-verdict"></p>
+              <p class="rnc-note" id="hyd-breakdown"></p>
+              <table class="rnc-guide-table left" id="hyd-table"></table>
+            </div>
+
+            <div class="rnc-metric">
+              <div class="rnc-metric-head">
+                <span>Blend protein <span class="rnc-note">(11–13%)</span></span>
+                <span class="rnc-value" id="prot-value">–</span>
+              </div>
+              <div class="rnc-meter" id="prot-meter"></div>
+              <p class="rnc-verdict" id="prot-verdict"></p>
+            </div>
+
+            <div class="rnc-metric">
+              <div class="rnc-metric-head">
+                <span>Alkali <span class="rnc-note">(kansui-eq, 0.8–1.3%)</span></span>
+                <span class="rnc-value" id="alk-value">–</span>
+              </div>
+              <div class="rnc-meter" id="alk-meter"></div>
+              <p class="rnc-verdict" id="alk-verdict"></p>
+            </div>
+
+            <div class="rnc-metric">
+              <div class="rnc-metric-head">
+                <span>Salt <span class="rnc-note">(1–2%)</span></span>
+                <span class="rnc-value" id="salt-value">–</span>
+              </div>
+              <div class="rnc-meter" id="salt-meter"></div>
+            </div>
+
+            <div class="rnc-metric">
+              <div class="rnc-metric-head">
+                <span>Predicted colour</span>
+                <span><span class="rnc-swatch" id="colour-swatch"></span></span>
+              </div>
+              <p class="rnc-verdict" id="colour-verdict"></p>
+            </div>
+
+            <div class="rnc-metric">
+              <div class="rnc-metric-head">
+                <span>Texture <span class="rnc-note">(heuristic)</span></span>
+              </div>
+              <div class="rnc-tex" id="tex"></div>
+            </div>
+
+            <div class="rnc-metric">
+              <div class="rnc-metric-head">
+                <span>Boil time <span class="rnc-note">(estimate)</span></span>
+              </div>
+              <table class="rnc-guide-table" id="cook-table"></table>
+            </div>
+          </section>
+
+          <section class="rnc-panel">
+            <h2>Style</h2>
+            <div class="rnc-toggle" role="group" aria-label="Style matching mode">
+              <button type="button" id="sm-pick" aria-pressed="true">Match a style</button>
+              <button type="button" id="sm-rank" aria-pressed="false">What did I make?</button>
+            </div>
+
+            <div id="pick-pane">
+              <div class="rnc-params">
+                <label style="flex: 1 1 100%">Style
+                  <select id="style-select"></select>
+                </label>
+              </div>
+              <p class="rnc-note" id="style-note"></p>
+              <div class="rnc-actions">
+                <button type="button" class="rnc-btn" id="load-ref">Load reference formula</button>
+              </div>
+              <table class="rnc-delta">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Yours</th>
+                    <th>Target</th>
+                  </tr>
+                </thead>
+                <tbody id="delta-rows"></tbody>
+              </table>
+              <p class="rnc-note">
+                Loading a reference replaces the whole formula, cut and crimp.
+              </p>
+            </div>
+
+            <div id="rank-pane" hidden>
+              <p class="rnc-note" id="broth-note"></p>
+              <ul class="rnc-rank" id="rank-list"></ul>
+            </div>
+
+            <p class="rnc-note">
+              Ranges are approximate published and community figures — a decent
+              map, not gospel. Shops vary, and most guard their exact spec.
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>© <span id="year">2026</span> Seb Carss</span>
+        <a href="https://github.com/sebcarss">GitHub</a>
+      </div>
+    </footer>
+
+    <script>
+      "use strict";
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      const $ = (id) => document.getElementById(id);
+
+      // ---- Reference data (all editable) ----------------------------------
+      const FLOURS = [
+        { name: "Strong bread flour",      protein: 12.7, ash: 0.55 },
+        { name: "Kyōrikiko (strong)",      protein: 12.0, ash: 0.40 },
+        { name: "Chūrikiko (medium)",      protein:  9.5, ash: 0.40 },
+        { name: "Hakurikiko (weak/cake)",  protein:  8.0, ash: 0.36 },
+        { name: "Plain / all-purpose",     protein: 10.5, ash: 0.45 },
+        { name: "00 pasta flour",          protein: 12.5, ash: 0.55 },
+        { name: "Wholemeal (zenryūfun)",   protein: 13.5, ash: 1.60 },
+        { name: "Rye",                     protein:  8.5, ash: 1.30 },
+        { name: "Vital wheat gluten",      protein: 75.0, ash: 0.70 },
+        { name: "Potato starch",           protein:  0.1, ash: 0.30 },
+        { name: "Tapioca starch",          protein:  0.1, ash: 0.20 },
+      ];
+
+      // Carbonate content in mmol CO₃²⁻ per gram of dry salt. Every alkali is
+      // normalised to ALKALI_REF — a 90:10 K₂CO₃:Na₂CO₃ powder — so the forms
+      // are directly comparable and styles only ever score one number.
+      const CARB_K = 1000 / 138.2;    // K₂CO₃  → 7.24
+      const CARB_NA = 1000 / 105.99;  // Na₂CO₃ → 9.43
+      // Bicarbonate carries a carbonate per 84 g but is a far weaker base; the
+      // 0.35 factor is empirical, matching the "use nearly twice as much" rule.
+      const CARB_BICARB = (1000 / 84.01) * 0.35; // → 4.17
+      const ALKALI_REF = 0.9 * CARB_K + 0.1 * CARB_NA;
+
+      // solids: fraction of the weighed dose that is dry salt (the rest is
+      // water, and it is counted once, in compute(), never here).
+      const KANSUI_FORMS = {
+        none:   { label: "no alkali",            solids: 1, ratio: false, conc: false, fixedK: null },
+        powder: { label: "powdered kansui",      solids: 1, ratio: true,  conc: false, fixedK: null },
+        liquid: { label: "liquid kansui",        solids: null, ratio: true, conc: true, fixedK: null },
+        baked:  { label: "baked baking soda",    solids: 1, ratio: false, conc: false, fixedK: 0 },
+        bicarb: { label: "sodium bicarbonate",   solids: 1, ratio: false, conc: false, fixedK: 0, bicarb: true },
+      };
+
+      // water: fraction of the ingredient that is water. wholeEq: how many
+      // grams of whole egg one gram of this is worth, for style scoring.
+      const EGG_FORMS = {
+        none:  { label: "none",               water: 0,    fat: 0,    wholeEq: 0, colour: 0    },
+        whole: { label: "whole egg",          water: 0.75, fat: 0.10, wholeEq: 1, colour: 0.35 },
+        yolk:  { label: "yolk",               water: 0.50, fat: 0.30, wholeEq: 3, colour: 1.00 },
+        dried: { label: "dried yolk powder",  water: 0.04, fat: 0.58, wholeEq: 6, colour: 2.20 },
+      };
+
+      // Standard Japanese cutter sizes. Higher number = thinner noodle.
+      const CUT_NUMBERS = [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30];
+      const CRIMPS = ["Straight", "Light wave", "Wavy", "Very wavy"];
+
+      const HYDRATION_BANDS = [
+        { from: 24, to: 30, label: "Hakata / barikata — sheet-and-fold only" },
+        { from: 30, to: 35, label: "Thin tonkotsu & firm shoyu noodles" },
+        { from: 35, to: 40, label: "Standard shoyu, shio and chūka soba" },
+        { from: 40, to: 46, label: "Miso, Kitakata and other aged noodles" },
+        { from: 46, to: 54, label: "Tsukemen & mazesoba — chewy, cold-rinsed" },
+      ];
+      const HYDRATION_SCALE = [24, 54];
+      const PROTEIN_TARGET = [11, 13];
+      const PROTEIN_SCALE = [7, 16];
+      const ALKALI_TARGET = [0.8, 1.3];
+      const ALKALI_SCALE = [0, 2.5];
+      const SALT_TARGET = [1, 2];
+      const SALT_SCALE = [0, 4];
+
+      // Boil time: t = K · area^0.85 · hydration factor. K is calibrated so a
+      // #26 × 1.1 mm noodle at 30% lands on ~55 s and a #12 × 2.2 mm tsukemen
+      // noodle at 42% lands on ~3½ min.
+      const COOK_K = 47.3;
+      const DONENESS = [
+        ["Katame (firm)", 0.7],
+        ["Futsū (normal)", 1.0],
+        ["Yawarakame (soft)", 1.35],
+      ];
+
+      const COLOUR_PALE = [232, 226, 210];
+      const COLOUR_YELLOW = [240, 196, 25];
+
+      const BROTHS = {
+        shio:     { label: "Shio",     hydration: [33, 40], cut: [20, 26], protein: [10.5, 12.5] },
+        shoyu:    { label: "Shoyu",    hydration: [33, 40], cut: [18, 24], protein: [11, 13] },
+        miso:     { label: "Miso",     hydration: [36, 44], cut: [16, 22], protein: [11, 13] },
+        tonkotsu: { label: "Tonkotsu", hydration: [26, 34], cut: [24, 30], protein: [11.5, 13.5] },
+      };
+
+      // Every band is [low, high]. crimp is a range of indices into CRIMPS,
+      // egg is a percentage expressed as whole-egg equivalent, aging is hours.
+      const STYLES = [
+        { id: "hakata", label: "Hakata tonkotsu", region: "Fukuoka", broth: "tonkotsu",
+          note: "Ultra-thin straight noodles built for kaedama refills — hydration is kept low so they cook in under a minute and stay firm enough to order barikata.",
+          hydration: [26, 32], protein: [11.5, 13.5], alkali: [0.8, 1.2], salt: [1, 2],
+          egg: [0, 0], cut: [24, 28], thickness: [0.9, 1.3], crimp: [0, 0], aging: [0, 12], serving: 100 },
+        { id: "kurume", label: "Kurume tonkotsu", region: "Fukuoka", broth: "tonkotsu",
+          note: "The birthplace of tonkotsu. A fraction thicker and softer than Hakata, under a heavier, longer-boiled broth.",
+          hydration: [27, 33], protein: [11.5, 13], alkali: [0.8, 1.2], salt: [1, 2],
+          egg: [0, 0], cut: [22, 26], thickness: [1.0, 1.4], crimp: [0, 0], aging: [0, 12], serving: 110 },
+        { id: "kumamoto", label: "Kumamoto tonkotsu", region: "Kumamoto", broth: "tonkotsu",
+          note: "Noticeably thicker and straighter than the Fukuoka noodles, with the body to stand up to burnt garlic oil (mayu).",
+          hydration: [30, 35], protein: [11, 13], alkali: [0.9, 1.3], salt: [1, 2],
+          egg: [0, 0], cut: [18, 22], thickness: [1.1, 1.5], crimp: [0, 1], aging: [6, 24], serving: 120 },
+        { id: "kagoshima", label: "Kagoshima ramen", region: "Kagoshima", broth: "tonkotsu",
+          note: "Unusually low-alkali and soft — closer to a plain Chinese wheat noodle than to the rest of Kyūshū.",
+          hydration: [32, 38], protein: [10.5, 12.5], alkali: [0.3, 0.7], salt: [1, 2],
+          egg: [0, 0], cut: [18, 22], thickness: [1.2, 1.6], crimp: [0, 1], aging: [6, 24], serving: 120 },
+        { id: "sapporo", label: "Sapporo miso", region: "Hokkaidō", broth: "miso",
+          note: "Springy yellow curls with high kansui — engineered to survive the wok and hold a thick, lard-capped miso broth.",
+          hydration: [36, 44], protein: [11, 13], alkali: [1.0, 1.5], salt: [1, 2],
+          egg: [0, 8], cut: [18, 22], thickness: [1.3, 1.7], crimp: [2, 3], aging: [24, 72], serving: 140 },
+        { id: "asahikawa", label: "Asahikawa shoyu", region: "Hokkaidō", broth: "shoyu",
+          note: "Low-hydration wavy noodles that drink up a lard-sealed double soup without going slack in the cold.",
+          hydration: [30, 36], protein: [11, 13], alkali: [0.9, 1.3], salt: [1, 2],
+          egg: [0, 6], cut: [20, 24], thickness: [1.1, 1.5], crimp: [1, 2], aging: [12, 48], serving: 130 },
+        { id: "muroran", label: "Muroran curry", region: "Hokkaidō", broth: "miso",
+          note: "Thick wavy noodles under a curry-miso broth — the crimp is doing the work of carrying a heavy, clinging sauce.",
+          hydration: [34, 40], protein: [11, 13], alkali: [1.0, 1.4], salt: [1, 2],
+          egg: [0, 8], cut: [18, 22], thickness: [1.2, 1.6], crimp: [2, 3], aging: [12, 48], serving: 140 },
+        { id: "hakodate", label: "Hakodate shio", region: "Hokkaidō", broth: "shio",
+          note: "Soft, pale, near-straight noodles that deliberately stay out of the way of a very clear salt broth.",
+          hydration: [33, 39], protein: [10.5, 12.5], alkali: [0.7, 1.1], salt: [1, 2],
+          egg: [0, 4], cut: [20, 24], thickness: [1.0, 1.4], crimp: [0, 1], aging: [6, 24], serving: 120 },
+        { id: "kitakata", label: "Kitakata", region: "Fukushima", broth: "shoyu",
+          note: "Flat, wide, heavily crimped and aged for days (熟成) — the widest mainstream ramen noodle in Japan, and eaten for breakfast.",
+          hydration: [40, 48], protein: [10.5, 12.5], alkali: [0.8, 1.2], salt: [1, 2],
+          egg: [0, 4], cut: [10, 14], thickness: [1.2, 1.6], crimp: [2, 3], aging: [48, 96], serving: 150 },
+        { id: "sano", label: "Sano ramen", region: "Tochigi", broth: "shoyu",
+          note: "Rolled out under a green bamboo pole (青竹打ち), so the noodles come out irregular, flat and very wavy.",
+          hydration: [38, 45], protein: [10, 12], alkali: [0.6, 1.0], salt: [1, 2],
+          egg: [0, 4], cut: [12, 16], thickness: [1.0, 1.6], crimp: [2, 3], aging: [12, 36], serving: 140 },
+        { id: "shirakawa", label: "Shirakawa", region: "Fukushima", broth: "shoyu",
+          note: "Hand-rolled, flat and wavy like Sano but a touch tighter and more consistent, in a clear soy broth.",
+          hydration: [38, 44], protein: [10.5, 12.5], alkali: [0.7, 1.1], salt: [1, 2],
+          egg: [0, 4], cut: [12, 16], thickness: [1.1, 1.5], crimp: [2, 3], aging: [24, 48], serving: 140 },
+        { id: "tokyo", label: "Tokyo chūka soba", region: "Tokyo", broth: "shoyu",
+          note: "The default ramen noodle — medium-thin, lightly wavy, often with a little egg for colour and richness.",
+          hydration: [33, 38], protein: [11, 12.5], alkali: [0.8, 1.2], salt: [1, 2],
+          egg: [2, 10], cut: [20, 24], thickness: [1.1, 1.4], crimp: [1, 2], aging: [12, 36], serving: 120 },
+        { id: "ogikubo", label: "Ogikubo", region: "Tokyo", broth: "shoyu",
+          note: "A thinner, firmer, higher-alkali take on the Tokyo noodle, from the shops around Ogikubo station.",
+          hydration: [32, 37], protein: [11, 13], alkali: [0.9, 1.3], salt: [1, 2],
+          egg: [0, 8], cut: [22, 26], thickness: [1.0, 1.3], crimp: [1, 2], aging: [12, 36], serving: 110 },
+        { id: "iekei", label: "Yokohama iekei", region: "Kanagawa", broth: "shoyu",
+          note: "Short, thick, dead-straight Sakai-style noodles, made to be pulled early (katame) out of a pork-and-soy broth.",
+          hydration: [30, 35], protein: [12, 14], alkali: [0.9, 1.3], salt: [1, 2],
+          egg: [0, 4], cut: [10, 14], thickness: [1.6, 2.2], crimp: [0, 0], aging: [12, 36], serving: 140 },
+        { id: "tsukemen", label: "Tsukemen", region: "Tokyo", broth: "shoyu",
+          note: "Very thick, high-hydration and cold-rinsed — hydration does the work here because the noodles are eaten chilled, not sitting in soup.",
+          hydration: [42, 50], protein: [12, 14], alkali: [0.8, 1.2], salt: [1, 2],
+          egg: [0, 6], cut: [8, 12], thickness: [1.8, 2.6], crimp: [0, 1], aging: [24, 72], serving: 200 },
+        { id: "aburasoba", label: "Abura soba / mazesoba", region: "Tokyo", broth: "shoyu",
+          note: "Thick chewy noodles with no broth at all — they only ever meet tare and oil, so all the body has to be in the noodle.",
+          hydration: [38, 46], protein: [12, 14], alkali: [0.9, 1.4], salt: [1, 2],
+          egg: [0, 6], cut: [10, 14], thickness: [1.5, 2.1], crimp: [1, 2], aging: [24, 48], serving: 160 },
+        { id: "nagoya", label: "Nagoya Taiwan ramen", region: "Aichi", broth: "shoyu",
+          note: "Medium wavy noodles under a chilli-and-minced-pork topping — the crimp catches the taiwan mince.",
+          hydration: [33, 38], protein: [11, 13], alkali: [0.9, 1.3], salt: [1, 2],
+          egg: [0, 6], cut: [18, 22], thickness: [1.1, 1.5], crimp: [1, 2], aging: [12, 36], serving: 130 },
+        { id: "wakayama", label: "Wakayama chūka soba", region: "Wakayama", broth: "tonkotsu",
+          note: "Thin straight noodles in a tonkotsu-shoyu hybrid — Kyūshū thinness with a Kansai soy backbone.",
+          hydration: [30, 35], protein: [11, 13], alkali: [0.8, 1.2], salt: [1, 2],
+          egg: [0, 4], cut: [22, 26], thickness: [1.0, 1.4], crimp: [0, 1], aging: [6, 24], serving: 110 },
+        { id: "tokushima", label: "Tokushima ramen", region: "Tokushima", broth: "tonkotsu",
+          note: "Medium-thin, low-alkali and pale, under a sweet-salty pork belly and a raw egg cracked on top.",
+          hydration: [30, 36], protein: [11, 13], alkali: [0.6, 1.0], salt: [1, 2],
+          egg: [0, 4], cut: [18, 22], thickness: [1.1, 1.5], crimp: [0, 1], aging: [6, 24], serving: 120 },
+        { id: "onomichi", label: "Onomichi ramen", region: "Hiroshima", broth: "shoyu",
+          note: "Thin, slightly flat, straight noodles under a soy broth studded with pork back-fat.",
+          hydration: [33, 38], protein: [10.5, 12.5], alkali: [0.7, 1.1], salt: [1, 2],
+          egg: [0, 4], cut: [20, 24], thickness: [1.0, 1.3], crimp: [0, 1], aging: [12, 36], serving: 120 },
+        { id: "tsubame", label: "Tsubame-Sanjō", region: "Niigata", broth: "shoyu",
+          note: "Very thick, almost udon-like noodles in a lard-capped niboshi broth — built for metalworkers' lunches that had to stay hot.",
+          hydration: [34, 40], protein: [11.5, 13.5], alkali: [0.9, 1.3], salt: [1, 2],
+          egg: [0, 4], cut: [8, 12], thickness: [1.6, 2.4], crimp: [1, 2], aging: [24, 48], serving: 160 },
+        { id: "hiroshima", label: "Hiroshima tsukemen", region: "Hiroshima", broth: "shio",
+          note: "Straight noodles served chilled with a chilli-vinegar dipping sauce and raw cabbage — no broth heat to soften them.",
+          hydration: [36, 42], protein: [11.5, 13.5], alkali: [0.8, 1.2], salt: [1, 2],
+          egg: [0, 4], cut: [14, 18], thickness: [1.2, 1.8], crimp: [0, 1], aging: [12, 48], serving: 170 },
+      ];
+
+      // Scoring weights and the tolerance over which a miss decays to zero.
+      const ATTRS = [
+        { key: "hydration", label: "Effective hydration", unit: "%",   w: 3,   tol: 8,   dp: 1 },
+        { key: "cut",       label: "Cut number",          unit: "",    w: 3,   tol: 8,   dp: 0, cut: true },
+        { key: "protein",   label: "Blend protein",       unit: "%",   w: 2,   tol: 2.5, dp: 1 },
+        { key: "thickness", label: "Thickness",           unit: " mm", w: 2,   tol: 0.8, dp: 2 },
+        { key: "alkali",    label: "Alkali (kansui-eq)",  unit: "%",   w: 2,   tol: 0.6, dp: 2 },
+        { key: "crimp",     label: "Crimp",               unit: "",    w: 1,   tol: 1.5, dp: 0, crimp: true },
+        { key: "egg",       label: "Egg (whole-egg eq)",  unit: "%",   w: 1,   tol: 6,   dp: 1 },
+        { key: "salt",      label: "Salt",                unit: "%",   w: 1,   tol: 1.5, dp: 1 },
+        { key: "aging",     label: "Aging",               unit: " h",  w: 0.5, tol: 48,  dp: 0 },
+      ];
+
+      const LS_RECIPES = "rnc:recipes";
+      const LS_FLOURS = "rnc:flours";
+
+      // ---- State ----------------------------------------------------------
+      // Percentages are the source of truth; gram fields write back to them.
+      let mode = "flour"; // "flour" | "target"
+      let matchMode = "pick"; // "pick" | "rank"
+      // The defaults are a deliberately middle-of-the-road medium noodle —
+      // #22 at 35%, no egg — so the page opens inside several real style bands
+      // rather than on something the matcher has to call a speciality.
+      let flours = [{ name: "Kyōrikiko (strong)", share: 100, protein: 12.0, ash: 0.4 }];
+
+      const loadJSON = (key) => {
+        try {
+          return JSON.parse(localStorage.getItem(key)) || [];
+        } catch {
+          return [];
+        }
+      };
+      const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+      let customFlours = loadJSON(LS_FLOURS);
+      let recipes = loadJSON(LS_RECIPES);
+
+      const allFlours = () => FLOURS.concat(customFlours);
+      const num = (id) => Number($(id).value) || 0;
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const round = (v, dp) => Math.round(v * 10 ** dp) / 10 ** dp;
+      const fmt = (g, dp = 0) =>
+        g.toLocaleString("en-GB", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+
+      const mmss = (s) =>
+        s < 60
+          ? Math.round(s) + " s"
+          : Math.floor(s / 60) + ":" + String(Math.round(s % 60)).padStart(2, "0");
+
+      // ---- Core maths -----------------------------------------------------
+      function compute() {
+        const shareTotal = flours.reduce((s, f) => s + (Number(f.share) || 0), 0);
+        if (!shareTotal) return null;
+
+        const waterPct = num("water-pct");
+        const saltPct = num("salt-pct");
+        const kansuiPct = num("kansui-pct");
+        const eggPct = $("egg-form").value === "none" ? 0 : num("egg-pct");
+        const colourPct = num("colour-pct");
+        const totalPct = 100 + waterPct + saltPct + kansuiPct + eggPct + colourPct;
+
+        const wastePct = clamp(num("waste"), 0, 90);
+        const servingG = Math.max(num("serving-g"), 1);
+
+        let flourG;
+        if (mode === "flour") {
+          flourG = num("flour-grams");
+        } else {
+          const doughNeeded = (num("servings") * servingG) / (1 - wastePct / 100);
+          flourG = doughNeeded / (totalPct / 100);
+        }
+        if (!flourG || flourG <= 0) return null;
+
+        const flourRows = flours.map((f) => ({
+          name: f.name,
+          share: Number(f.share) || 0,
+          protein: Number(f.protein) || 0,
+          ash: Number(f.ash) || 0,
+          grams: ((Number(f.share) || 0) / shareTotal) * flourG,
+        }));
+        const blendProtein =
+          flourRows.reduce((s, f) => s + f.share * f.protein, 0) / shareTotal;
+        const blendAsh = flourRows.reduce((s, f) => s + f.share * f.ash, 0) / shareTotal;
+
+        // -- Alkali. Every form is reduced to a "% of 90:10 kansui powder".
+        const kForm = $("kansui-form").value;
+        const kf = KANSUI_FORMS[kForm];
+        const kSolids = kf.conc ? clamp(num("kansui-conc"), 0, 100) / 100 : kf.solids;
+        const kRatioK = kf.fixedK !== null ? kf.fixedK : clamp(num("kansui-ratio"), 0, 100);
+        const kansuiG = kForm === "none" ? 0 : (flourG * kansuiPct) / 100;
+        const kansuiSaltG = kansuiG * kSolids;
+        const kansuiWaterG = kansuiG - kansuiSaltG;
+        const carbPerG = kf.bicarb
+          ? CARB_BICARB
+          : (kRatioK / 100) * CARB_K + (1 - kRatioK / 100) * CARB_NA;
+        const alkaliEqPct =
+          kForm === "none" ? 0 : ((kansuiSaltG / flourG) * 100 * carbPerG) / ALKALI_REF;
+
+        // -- Egg.
+        const ef = EGG_FORMS[$("egg-form").value];
+        const eggG = (flourG * eggPct) / 100;
+        const eggWaterG = eggG * ef.water;
+        const eggFatG = eggG * ef.fat;
+        const eggWholeEqPct = eggPct * ef.wholeEq;
+
+        // -- Water is summed in exactly one place. Ingredient tables never
+        // carry hydration figures of their own, so nothing gets counted twice.
+        const addedWaterG = (flourG * waterPct) / 100;
+        const totalWaterG = addedWaterG + kansuiWaterG + eggWaterG;
+        const addedHydration = (addedWaterG / flourG) * 100;
+        const effHydration = (totalWaterG / flourG) * 100;
+
+        const saltG = (flourG * saltPct) / 100;
+        const colourG = (flourG * colourPct) / 100;
+        const doughG = flourG + addedWaterG + kansuiG + saltG + eggG + colourG;
+        const usableG = doughG * (1 - wastePct / 100);
+        const servings = usableG / servingG;
+
+        // -- Geometry.
+        const cut = Number($("cut").value);
+        const widthMm = 30 / cut;
+        const thicknessMm = Number($("thickness").value);
+        const aspect = widthMm / thicknessMm;
+        const areaMm2 = widthMm * thicknessMm;
+        const shapeLabel =
+          aspect < 0.8
+            ? "tall — deeper than it is wide"
+            : aspect < 1.25
+              ? "square (kaku)"
+              : aspect < 2
+                ? "flat"
+                : "wide ribbon (hira-uchi)";
+        const crimpIdx = Number($("crimp").value);
+        const agingHours = num("aging");
+
+        const base = COOK_K * areaMm2 ** 0.85 * (1 + (effHydration - 35) / 100);
+        const cook = DONENESS.map(([label, k]) => [label, Math.max(base * k, 10)]);
+
+        // -- Colour and texture, both openly heuristic.
+        const yellow = clamp(
+          alkaliEqPct * 0.55 + (eggPct * ef.colour) / 20 + colourPct * 3,
+          0,
+          1.4,
+        );
+        const t = yellow / 1.4;
+        const colourRgb = COLOUR_PALE.map((c, i) =>
+          Math.round(c + (COLOUR_YELLOW[i] - c) * t),
+        );
+
+        const texture = {
+          chew: clamp(
+            30 +
+              (blendProtein - 10) * 9 +
+              alkaliEqPct * 18 -
+              (effHydration - 35) * 1.1 +
+              (thicknessMm - 1.4) * 6,
+            0,
+            100,
+          ),
+          firmness: clamp(
+            25 + (blendProtein - 10) * 8 - (effHydration - 35) * 1.8 + alkaliEqPct * 10,
+            0,
+            100,
+          ),
+          smoothness: clamp(
+            40 +
+              (effHydration - 32) * 2.2 -
+              (blendAsh - 0.5) * 18 +
+              Math.min(agingHours, 72) * 0.28,
+            0,
+            100,
+          ),
+        };
+
+        return {
+          shareTotal, flourG, flourRows, blendProtein, blendAsh,
+          waterPct, saltPct, kansuiPct, eggPct, colourPct, totalPct,
+          addedWaterG, kansuiWaterG, eggWaterG, totalWaterG,
+          addedHydration, effHydration,
+          kForm, kansuiG, kansuiSaltG, alkaliEqPct, kRatioK, carbPerG,
+          eggForm: $("egg-form").value, eggG, eggFatG, eggWholeEqPct,
+          saltG, colourG, doughG, usableG, servings, servingG, wastePct,
+          cut, widthMm, thicknessMm, aspect, areaMm2, shapeLabel, crimpIdx,
+          agingHours, cook, colourRgb, yellow, texture,
+        };
+      }
+
+      // ---- Flour rows ------------------------------------------------------
+      function buildFlourSelect(selected) {
+        const sel = document.createElement("select");
+        const add = (parent, f) => {
+          const o = document.createElement("option");
+          o.value = f.name;
+          o.textContent = f.name;
+          parent.appendChild(o);
+        };
+        for (const f of FLOURS) add(sel, f);
+        if (customFlours.length) {
+          const grp = document.createElement("optgroup");
+          grp.label = "Your flours";
+          for (const f of customFlours) add(grp, f);
+          sel.appendChild(grp);
+        }
+        if (!allFlours().some((f) => f.name === selected)) {
+          const o = document.createElement("option");
+          o.value = selected;
+          o.textContent = selected;
+          sel.appendChild(o);
+        }
+        sel.value = selected;
+        return sel;
+      }
+
+      function renderFlourRows() {
+        const tbody = $("flour-rows");
+        tbody.textContent = "";
+        flours.forEach((f, idx) => {
+          const tr = document.createElement("tr");
+
+          const nameTd = document.createElement("td");
+          const sel = buildFlourSelect(f.name);
+          sel.setAttribute("aria-label", "Flour " + (idx + 1));
+          sel.addEventListener("change", () => {
+            const src = allFlours().find((x) => x.name === sel.value);
+            f.name = sel.value;
+            if (src) {
+              f.protein = src.protein;
+              f.ash = src.ash;
+            }
+            update();
+          });
+          nameTd.appendChild(sel);
+
+          const mkNum = (val, step, label, apply) => {
+            const td = document.createElement("td");
+            const input = document.createElement("input");
+            input.type = "number";
+            input.min = "0";
+            input.step = step;
+            input.value = val;
+            input.setAttribute("aria-label", label + " " + (idx + 1));
+            input.addEventListener("input", () => {
+              apply(input.value);
+              update(true);
+            });
+            td.appendChild(input);
+            return td;
+          };
+
+          const shareTd = mkNum(f.share, "5", "Share percent", (v) => (f.share = v));
+          const protTd = mkNum(f.protein, "0.1", "Protein percent", (v) => (f.protein = v));
+          const ashTd = mkNum(f.ash, "0.05", "Ash percent", (v) => (f.ash = v));
+
+          const gTd = document.createElement("td");
+          gTd.className = "rnc-grams";
+          gTd.id = "flour-g-" + idx;
+
+          const xTd = document.createElement("td");
+          if (flours.length > 1) {
+            const x = document.createElement("button");
+            x.type = "button";
+            x.className = "rnc-remove";
+            x.textContent = "✕";
+            x.title = "Remove";
+            x.setAttribute("aria-label", "Remove flour " + (idx + 1));
+            x.addEventListener("click", () => {
+              flours.splice(idx, 1);
+              update();
+            });
+            xTd.appendChild(x);
+          }
+
+          tr.append(nameTd, shareTd, protTd, ashTd, gTd, xTd);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderFlourList() {
+        const ul = $("flour-list");
+        ul.textContent = "";
+        for (const f of customFlours) {
+          const li = document.createElement("li");
+          const name = document.createElement("span");
+          const meta = document.createElement("span");
+          meta.className = "meta";
+          meta.textContent = " " + f.protein + "% protein · " + f.ash + "% ash";
+          name.append(f.name, meta);
+
+          const btns = document.createElement("span");
+          btns.className = "btns";
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "rnc-btn";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => {
+            if (!confirm('Delete flour "' + f.name + '"?')) return;
+            customFlours = customFlours.filter((x) => x !== f);
+            saveJSON(LS_FLOURS, customFlours);
+            renderFlourList();
+            update();
+          });
+          btns.appendChild(del);
+
+          li.append(name, btns);
+          ul.appendChild(li);
+        }
+      }
+
+      // ---- Meters ----------------------------------------------------------
+      function band(meter, from, to, scale, cls) {
+        const [lo, hi] = scale;
+        const div = document.createElement("div");
+        div.className = "band " + cls;
+        div.style.left = ((from - lo) / (hi - lo)) * 100 + "%";
+        div.style.width = ((to - from) / (hi - lo)) * 100 + "%";
+        meter.appendChild(div);
+      }
+
+      function marker(meter, value, scale) {
+        const [lo, hi] = scale;
+        const div = document.createElement("div");
+        div.className = "marker";
+        div.style.left = clamp(((value - lo) / (hi - lo)) * 100, 0, 99) + "%";
+        meter.appendChild(div);
+      }
+
+      function simpleMeter(id, value, target, scale) {
+        const meter = $(id);
+        meter.textContent = "";
+        band(meter, target[0], target[1], scale, "target");
+        if (value != null) marker(meter, value, scale);
+      }
+
+      function statusClass(value, target) {
+        if (value == null) return "";
+        return value >= target[0] && value <= target[1] ? "ok" : "off";
+      }
+
+      // ---- Analysis --------------------------------------------------------
+      function renderAnalysis(r) {
+        // Hydration — banded meter with the workability legend beneath.
+        const hm = $("hyd-meter");
+        hm.textContent = "";
+        HYDRATION_BANDS.forEach((b, i) =>
+          band(hm, b.from, b.to, HYDRATION_SCALE, i % 2 ? "alt" : ""),
+        );
+        if (r) marker(hm, r.effHydration, HYDRATION_SCALE);
+
+        const hs = $("hyd-scale");
+        if (!hs.childElementCount) {
+          const [lo, hi] = HYDRATION_SCALE;
+          for (let v = lo; v <= hi; v += 5) {
+            const s = document.createElement("span");
+            s.style.left = ((v - lo) / (hi - lo)) * 100 + "%";
+            s.textContent = v;
+            hs.appendChild(s);
+          }
+        }
+
+        const ht = $("hyd-table");
+        if (!ht.childElementCount) {
+          for (const b of HYDRATION_BANDS) {
+            const tr = document.createElement("tr");
+            const a = document.createElement("td");
+            a.textContent = b.from + "–" + b.to + "%";
+            const c = document.createElement("td");
+            c.textContent = b.label;
+            tr.append(a, c);
+            ht.appendChild(tr);
+          }
+        }
+
+        $("hyd-value").textContent = r ? r.effHydration.toFixed(1) + "%" : "–";
+        const match = r && HYDRATION_BANDS.find((b) => r.effHydration >= b.from && r.effHydration < b.to);
+        $("hyd-verdict").textContent = !r
+          ? ""
+          : match
+            ? "→ " + match.label.toLowerCase() + "."
+            : r.effHydration < HYDRATION_BANDS[0].from
+              ? "→ drier than any noodle anyone sells."
+              : "→ wetter than ramen dough goes — this is closer to udon.";
+
+        $("hyd-breakdown").textContent = !r
+          ? ""
+          : "Added water " +
+            r.addedHydration.toFixed(1) +
+            "% · kansui " +
+            fmt(r.kansuiWaterG, 0) +
+            " g · egg " +
+            fmt(r.eggWaterG, 0) +
+            " g → " +
+            fmt(r.totalWaterG, 0) +
+            " g total water.";
+
+        // Protein.
+        simpleMeter("prot-meter", r ? r.blendProtein : null, PROTEIN_TARGET, PROTEIN_SCALE);
+        const pv = $("prot-value");
+        pv.textContent = r ? r.blendProtein.toFixed(1) + "%" : "–";
+        pv.className = "rnc-value " + statusClass(r ? r.blendProtein : null, PROTEIN_TARGET);
+        $("prot-verdict").textContent = !r
+          ? ""
+          : r.blendProtein < 9.5
+            ? "→ too weak to sheet thin without tearing."
+            : r.blendProtein < 11
+              ? "→ soft — tender, less snap. Fine for a delicate shio."
+              : r.blendProtein > 14.5
+                ? "→ very strong — hard work to sheet, and it will want a long rest."
+                : r.blendProtein > 13
+                  ? "→ strong — chewy, good for thick or tsukemen noodles."
+                  : "→ the standard ramen window.";
+
+        // Alkali.
+        simpleMeter("alk-meter", r ? r.alkaliEqPct : null, ALKALI_TARGET, ALKALI_SCALE);
+        const av = $("alk-value");
+        av.textContent = r ? r.alkaliEqPct.toFixed(2) + "%" : "–";
+        av.className = "rnc-value " + statusClass(r ? r.alkaliEqPct : null, ALKALI_TARGET);
+        $("alk-verdict").textContent = !r
+          ? ""
+          : r.alkaliEqPct === 0
+            ? "→ no alkali at all. That's a Chinese-style wheat noodle, not a ramen noodle."
+            : r.alkaliEqPct < 0.5
+              ? "→ barely alkaline — pale and soft, Kagoshima territory."
+              : r.alkaliEqPct > 1.8
+                ? "→ very high — expect a soapy, bitter edge and a slippery surface."
+                : r.alkaliEqPct > 1.3
+                  ? "→ high — deep yellow and very springy, Sapporo territory."
+                  : "→ the usual working range.";
+
+        // Salt.
+        simpleMeter("salt-meter", r ? r.saltPct : null, SALT_TARGET, SALT_SCALE);
+        const sv = $("salt-value");
+        sv.textContent = r ? r.saltPct.toFixed(1) + "%" : "–";
+        sv.className = "rnc-value " + statusClass(r ? r.saltPct : null, SALT_TARGET);
+
+        // Colour.
+        const sw = $("colour-swatch");
+        sw.style.background = r ? "rgb(" + r.colourRgb.join(",") + ")" : "transparent";
+        $("colour-verdict").textContent = !r
+          ? ""
+          : r.yellow < 0.15
+            ? "Near-white — no alkali or egg to yellow it."
+            : r.yellow < 0.45
+              ? "Pale straw."
+              : r.yellow < 0.8
+                ? "The familiar ramen yellow."
+                : "Deep yellow — heavy kansui, egg, or both.";
+
+        // Texture.
+        const tex = $("tex");
+        tex.textContent = "";
+        const bars = r
+          ? [
+              ["Chew (koshi)", r.texture.chew],
+              ["Firmness", r.texture.firmness],
+              ["Smoothness", r.texture.smoothness],
+            ]
+          : [["Chew (koshi)", 0], ["Firmness", 0], ["Smoothness", 0]];
+        for (const [label, v] of bars) {
+          const l = document.createElement("span");
+          l.className = "label";
+          l.textContent = label;
+          const track = document.createElement("div");
+          track.className = "track";
+          const fill = document.createElement("div");
+          fill.className = "fill";
+          fill.style.width = v + "%";
+          track.appendChild(fill);
+          const n = document.createElement("span");
+          n.className = "num";
+          n.textContent = r ? Math.round(v) : "–";
+          tex.append(l, track, n);
+        }
+
+        // Boil time.
+        const ct = $("cook-table");
+        ct.textContent = "";
+        if (r) {
+          for (const [label, secs] of r.cook) {
+            const tr = document.createElement("tr");
+            const a = document.createElement("td");
+            a.textContent = label;
+            const b = document.createElement("td");
+            b.textContent = mmss(secs);
+            tr.append(a, b);
+            ct.appendChild(tr);
+          }
+        }
+      }
+
+      // ---- Geometry & preview ---------------------------------------------
+      const SVG_NS = "http://www.w3.org/2000/svg";
+      const NICE_MM = [0.25, 0.5, 1, 2, 5, 10];
+      const svgEl = (name, attrs) => {
+        const el = document.createElementNS(SVG_NS, name);
+        for (const k in attrs) el.setAttribute(k, attrs[k]);
+        return el;
+      };
+
+      function renderGeometry(r) {
+        const gt = $("geom-table");
+        gt.textContent = "";
+        if (!r) return;
+        const rows = [
+          ["Width", r.widthMm.toFixed(2) + " mm (30 ÷ " + r.cut + ")"],
+          ["Thickness", r.thicknessMm.toFixed(2) + " mm"],
+          ["Aspect (w : t)", r.aspect.toFixed(2) + " : 1 — " + r.shapeLabel],
+          ["Cross-section", r.areaMm2.toFixed(2) + " mm²"],
+        ];
+        for (const [k, v] of rows) {
+          const tr = document.createElement("tr");
+          const a = document.createElement("td");
+          a.textContent = k;
+          const b = document.createElement("td");
+          b.textContent = v;
+          tr.append(a, b);
+          gt.appendChild(tr);
+        }
+      }
+
+      function renderXsec(r) {
+        const svg = $("xsec");
+        svg.textContent = "";
+        $("xsec-note").textContent = "";
+        if (!r) return;
+
+        const W = 300;
+        const H = 110;
+        const count = 5;
+        // Fit five noodles plus half-width gaps into the drawing area, then
+        // clamp so a very thick noodle still fits vertically.
+        let scale = 250 / (count * r.widthMm + (count - 1) * r.widthMm * 0.6);
+        scale = Math.min(scale, 56 / r.thicknessMm, 160);
+        const w = r.widthMm * scale;
+        const h = r.thicknessMm * scale;
+        const gap = w * 0.6;
+        const totalW = count * w + (count - 1) * gap;
+        const x0 = (W - totalW) / 2;
+        const yMid = 48;
+        const fill = "rgb(" + r.colourRgb.join(",") + ")";
+
+        for (let i = 0; i < count; i++) {
+          svg.appendChild(
+            svgEl("rect", {
+              x: x0 + i * (w + gap),
+              y: yMid - h / 2,
+              width: w,
+              height: h,
+              rx: Math.min(w, h) * 0.12,
+              fill,
+              stroke: "#9ca3af",
+              "stroke-width": 0.8,
+            }),
+          );
+        }
+
+        // Scale bar, in whichever round number of mm draws at least 40 px at
+        // the current magnification — a fixed 1 mm bar vanishes on thick cuts.
+        const barMm = NICE_MM.find((m) => m * scale >= 40) || NICE_MM[NICE_MM.length - 1];
+        const barW = barMm * scale;
+        const barX = (W - barW) / 2;
+        svg.appendChild(
+          svgEl("line", { x1: barX, y1: 88, x2: barX + barW, y2: 88, stroke: "#6b7280", "stroke-width": 1 }),
+        );
+        for (const x of [barX, barX + barW]) {
+          svg.appendChild(svgEl("line", { x1: x, y1: 84, x2: x, y2: 92, stroke: "#6b7280", "stroke-width": 1 }));
+        }
+        const label = svgEl("text", {
+          x: W / 2, y: 104, "text-anchor": "middle", fill: "#6b7280", "font-size": 10,
+        });
+        label.textContent = barMm + " mm";
+        svg.appendChild(label);
+
+        $("xsec-note").textContent =
+          "Cross-section at " + Math.round(scale) + "× — " + r.shapeLabel + ".";
+      }
+
+      function renderCrimp(r) {
+        const svg = $("crimp-svg");
+        svg.textContent = "";
+        if (!r) return;
+        const stroke = clamp(r.thicknessMm * 5, 2, 14);
+        // Amplitude scales with the strand so the wave stays visible against a
+        // thick noodle, then caps so it cannot run out of the viewBox.
+        const amp = Math.min([0, 0.6, 1.3, 2.1][r.crimpIdx] * stroke, [0, 8, 13, 18][r.crimpIdx]);
+        const period = [1, 90, 55, 38][r.crimpIdx];
+        let d = "M 20 32";
+        for (let x = 20; x <= 280; x += 2) {
+          const y = 32 + (amp ? Math.sin(((x - 20) / period) * Math.PI * 2) * amp : 0);
+          d += " L " + x + " " + y.toFixed(2);
+        }
+        svg.appendChild(
+          svgEl("path", {
+            d,
+            fill: "none",
+            stroke: "rgb(" + r.colourRgb.join(",") + ")",
+            "stroke-width": stroke,
+            "stroke-linecap": "round",
+          }),
+        );
+        svg.appendChild(
+          svgEl("path", { d, fill: "none", stroke: "#9ca3af", "stroke-width": 0.6 }),
+        );
+        const label = svgEl("text", {
+          x: 150, y: 66, "text-anchor": "middle", fill: "#6b7280", "font-size": 10,
+        });
+        label.textContent = CRIMPS[r.crimpIdx] + " — profile along the strand";
+        svg.appendChild(label);
+      }
+
+      // ---- Style matching --------------------------------------------------
+      function attrValues(r) {
+        return {
+          hydration: r.effHydration,
+          cut: r.cut,
+          protein: r.blendProtein,
+          thickness: r.thicknessMm,
+          alkali: r.alkaliEqPct,
+          crimp: r.crimpIdx,
+          egg: r.eggWholeEqPct,
+          salt: r.saltPct,
+          aging: r.agingHours,
+        };
+      }
+
+      // 1.0 dead centre of the band, 0.98 at its edges, then a linear decay to
+      // zero across `tol`. The tiny in-band slope is only there to break ties
+      // between styles whose bands overlap.
+      function scoreAttr(v, range, tol) {
+        const [lo, hi] = range;
+        const mid = (lo + hi) / 2;
+        const half = (hi - lo) / 2 || 1;
+        if (v >= lo && v <= hi) return 1 - 0.02 * (Math.abs(v - mid) / half);
+        const d = v < lo ? lo - v : v - hi;
+        return Math.max(0, 0.98 - d / tol);
+      }
+
+      function scoreStyle(vals, style) {
+        let sum = 0;
+        let wsum = 0;
+        const misses = [];
+        for (const a of ATTRS) {
+          const s = scoreAttr(vals[a.key], style[a.key], a.tol);
+          sum += s * a.w;
+          wsum += a.w;
+          if (s < 0.7) misses.push(a);
+        }
+        return { pct: (sum / wsum) * 100, misses };
+      }
+
+      function fmtTarget(a, range) {
+        if (a.crimp) {
+          return range[0] === range[1]
+            ? CRIMPS[range[0]]
+            : CRIMPS[range[0]] + "–" + CRIMPS[range[1]].toLowerCase();
+        }
+        if (a.cut) {
+          return (
+            "#" + range[0] + "–" + range[1] +
+            " (" + (30 / range[1]).toFixed(2) + "–" + (30 / range[0]).toFixed(2) + " mm)"
+          );
+        }
+        return range[0] + "–" + range[1] + a.unit;
+      }
+
+      function fmtValue(a, v) {
+        if (a.crimp) return CRIMPS[v];
+        if (a.cut) return "#" + v;
+        return v.toFixed(a.dp) + a.unit;
+      }
+
+      function renderStyleMatch(r) {
+        $("pick-pane").hidden = matchMode !== "pick";
+        $("rank-pane").hidden = matchMode !== "rank";
+
+        const style = STYLES.find((s) => s.id === $("style-select").value) || STYLES[0];
+        $("style-note").textContent = style.region + " · " + style.note;
+
+        const tbody = $("delta-rows");
+        tbody.textContent = "";
+        if (r) {
+          const vals = attrValues(r);
+          for (const a of ATTRS) {
+            const range = style[a.key];
+            const inBand = vals[a.key] >= range[0] && vals[a.key] <= range[1];
+            const tr = document.createElement("tr");
+            const k = document.createElement("td");
+            k.textContent = a.label;
+            const v = document.createElement("td");
+            v.className = inBand ? "ok" : "off";
+            v.textContent = (inBand ? "✓ " : "⚠ ") + fmtValue(a, vals[a.key]);
+            const t = document.createElement("td");
+            t.textContent = fmtTarget(a, range);
+            tr.append(k, v, t);
+            tbody.appendChild(tr);
+          }
+        }
+
+        const list = $("rank-list");
+        list.textContent = "";
+        if (!r) {
+          $("broth-note").textContent = "";
+          return;
+        }
+        const vals = attrValues(r);
+        const ranked = STYLES.map((s) => ({ style: s, ...scoreStyle(vals, s) }))
+          .sort((a, b) => b.pct - a.pct)
+          .slice(0, 5);
+
+        for (const row of ranked) {
+          const li = document.createElement("li");
+          const head = document.createElement("div");
+          head.className = "head";
+          const name = document.createElement("span");
+          name.textContent = row.style.label;
+          const pct = document.createElement("span");
+          pct.className = "pct";
+          pct.textContent = Math.round(row.pct) + "%";
+          head.append(name, pct);
+
+          const track = document.createElement("div");
+          track.className = "track";
+          const fill = document.createElement("div");
+          fill.className = "fill";
+          fill.style.width = clamp(row.pct, 0, 100) + "%";
+          track.appendChild(fill);
+
+          const why = document.createElement("p");
+          why.className = "why";
+          why.textContent = row.misses.length
+            ? "Off on " + row.misses.map((a) => a.label.toLowerCase()).join(", ") + "."
+            : "Everything inside the band.";
+
+          li.append(head, track, why);
+          list.appendChild(li);
+        }
+
+        const suits = Object.entries(BROTHS)
+          .filter(
+            ([, b]) =>
+              r.effHydration >= b.hydration[0] && r.effHydration <= b.hydration[1] &&
+              r.cut >= b.cut[0] && r.cut <= b.cut[1] &&
+              r.blendProtein >= b.protein[0] && r.blendProtein <= b.protein[1],
+          )
+          .map(([, b]) => b.label);
+        $("broth-note").textContent = suits.length
+          ? "On the broad broth-type bands this suits: " + suits.join(", ") + "."
+          : "This falls outside all four broad broth-type bands — a speciality noodle.";
+      }
+
+      function loadReference() {
+        const style = STYLES.find((s) => s.id === $("style-select").value);
+        if (!style) return;
+        const mid = (a) => (style[a][0] + style[a][1]) / 2;
+
+        flours = [
+          { name: "Reference blend", share: 100, protein: round(mid("protein"), 1), ash: 0.45 },
+        ];
+
+        const eggPct = round(mid("egg"), 1);
+        $("egg-form").value = eggPct > 0 ? "whole" : "none";
+        $("egg-pct").value = eggPct;
+
+        $("kansui-form").value = "none";
+        $("kansui-ratio").value = 90;
+        if (mid("alkali") > 0) {
+          $("kansui-form").value = "powder";
+          $("kansui-pct").value = round(mid("alkali"), 2);
+        } else {
+          $("kansui-pct").value = 0;
+        }
+
+        // Egg water is already counted in effective hydration, so the added
+        // water has to be reduced by it to land on the style's target.
+        const eggWater = eggPct * EGG_FORMS[$("egg-form").value].water;
+        $("water-pct").value = round(mid("hydration") - eggWater, 1);
+        $("salt-pct").value = round(mid("salt"), 1);
+        $("colour-pct").value = 0;
+        $("aging").value = Math.round(mid("aging"));
+        $("serving-g").value = style.serving;
+
+        const targetCut = mid("cut");
+        const cut = CUT_NUMBERS.reduce((best, c) =>
+          Math.abs(c - targetCut) < Math.abs(best - targetCut) ? c : best,
+        );
+        $("cut").value = cut;
+        setThickness(round(mid("thickness"), 2));
+        $("crimp").value = Math.round(mid("crimp"));
+
+        update();
+      }
+
+      // ---- Saved recipes ---------------------------------------------------
+      function snapshot(name) {
+        return {
+          name, mode,
+          flourGrams: num("flour-grams"),
+          servings: num("servings"),
+          servingG: num("serving-g"),
+          waste: num("waste"),
+          flours: flours.map((f) => ({
+            name: f.name,
+            share: Number(f.share) || 0,
+            protein: Number(f.protein) || 0,
+            ash: Number(f.ash) || 0,
+          })),
+          water: num("water-pct"),
+          salt: num("salt-pct"),
+          kansuiForm: $("kansui-form").value,
+          kansui: num("kansui-pct"),
+          kansuiConc: num("kansui-conc"),
+          kansuiRatio: num("kansui-ratio"),
+          eggForm: $("egg-form").value,
+          egg: num("egg-pct"),
+          colour: num("colour-pct"),
+          aging: num("aging"),
+          cut: Number($("cut").value),
+          thickness: Number($("thickness").value),
+          crimp: Number($("crimp").value),
+        };
+      }
+
+      function applyRecipe(r) {
+        $("flour-grams").value = r.flourGrams;
+        $("servings").value = r.servings;
+        $("serving-g").value = r.servingG;
+        $("waste").value = r.waste;
+        flours = r.flours.map((f) => ({ ...f }));
+        $("water-pct").value = r.water;
+        $("salt-pct").value = r.salt;
+        $("kansui-form").value = r.kansuiForm;
+        $("kansui-pct").value = r.kansui;
+        $("kansui-conc").value = r.kansuiConc;
+        $("kansui-ratio").value = r.kansuiRatio;
+        $("egg-form").value = r.eggForm;
+        $("egg-pct").value = r.egg;
+        $("colour-pct").value = r.colour;
+        $("aging").value = r.aging;
+        $("cut").value = r.cut;
+        setThickness(r.thickness);
+        $("crimp").value = r.crimp;
+        $("recipe-name").value = r.name;
+        setMode(r.mode);
+        update();
+      }
+
+      function renderRecipes() {
+        const ul = $("recipe-list");
+        ul.textContent = "";
+        for (const r of recipes) {
+          const li = document.createElement("li");
+          const name = document.createElement("span");
+          const meta = document.createElement("span");
+          meta.className = "meta";
+          meta.textContent = " #" + r.cut + " · " + r.water + "% water";
+          name.append(r.name, meta);
+
+          const btns = document.createElement("span");
+          btns.className = "btns";
+          const load = document.createElement("button");
+          load.type = "button";
+          load.className = "rnc-btn";
+          load.textContent = "Load";
+          load.addEventListener("click", () => applyRecipe(r));
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "rnc-btn";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => {
+            if (!confirm('Delete recipe "' + r.name + '"?')) return;
+            recipes = recipes.filter((x) => x !== r);
+            saveJSON(LS_RECIPES, recipes);
+            renderRecipes();
+          });
+          btns.append(load, del);
+
+          li.append(name, btns);
+          ul.appendChild(li);
+        }
+      }
+
+      // ---- Update ----------------------------------------------------------
+      function update(skipStructure) {
+        if (!skipStructure) renderFlourRows();
+
+        const kf = KANSUI_FORMS[$("kansui-form").value];
+        $("kansui-conc-label").hidden = !kf.conc;
+        $("kansui-ratio-label").hidden = !kf.ratio;
+        $("kansui-ratio-out").textContent = kf.ratio
+          ? num("kansui-ratio") + " : " + (100 - num("kansui-ratio"))
+          : "";
+        const eggOff = $("egg-form").value === "none";
+        $("egg-pct").disabled = eggOff;
+        $("egg-g").disabled = eggOff;
+        $("kansui-label").textContent = "Kansui — " + kf.label;
+        $("egg-label").textContent = "Egg — " + EGG_FORMS[$("egg-form").value].label;
+
+        const targetMode = mode === "target";
+        $("flour-grams").readOnly = targetMode;
+
+        const r = compute();
+
+        // Derived gram fields, without stomping whatever the user is typing.
+        const setG = (id, val, dp) => {
+          const el = $(id);
+          if (document.activeElement !== el)
+            el.value = r ? round(val, dp) : "";
+        };
+        setG("water-g", r ? r.addedWaterG : 0, 0);
+        setG("salt-g", r ? r.saltG : 0, 1);
+        setG("kansui-g", r ? r.kansuiG : 0, 1);
+        setG("egg-g", r ? r.eggG : 0, 1);
+        setG("colour-g", r ? r.colourG : 0, 2);
+        if (targetMode) setG("flour-grams", r ? r.flourG : 0, 0);
+
+        $("share-total").textContent = r ? r.shareTotal + "%" : "";
+        $("blend-protein").textContent = r ? r.blendProtein.toFixed(1) + "%" : "";
+        $("blend-ash").textContent = r ? r.blendAsh.toFixed(2) + "%" : "";
+        $("flour-total").textContent = r ? fmt(r.flourG) + " g" : "";
+        if (r) {
+          r.flourRows.forEach((f, i) => {
+            const cell = $("flour-g-" + i);
+            if (cell) cell.textContent = fmt(f.grams) + " g";
+          });
+        }
+
+        const bw = $("blend-warn");
+        if (r && Math.round(r.shareTotal) !== 100) {
+          bw.textContent =
+            "⚠ Flour shares add up to " +
+            fmt(r.shareTotal, 1) +
+            "%, not 100 — percentages are still taken against the total.";
+          bw.hidden = false;
+        } else {
+          bw.hidden = true;
+        }
+
+        $("total-pct").textContent = r ? fmt(r.totalPct, 1) + "%" : "";
+        $("total-g").textContent = r ? fmt(r.doughG) + " g" : "";
+        $("yield-note").textContent = r
+          ? fmt(r.servings, 1) + " × " + fmt(r.servingG) + " g after " + fmt(r.wastePct) + "% waste"
+          : "";
+        $("target-flour-note").textContent = r && targetMode ? "→ " + fmt(r.flourG) + " g flour" : "";
+        $("water-note").textContent = r ? "added only" : "";
+        $("kansui-eq").textContent = r
+          ? r.alkaliEqPct.toFixed(2) + "% kansui-eq"
+          : "";
+        $("egg-note").textContent =
+          r && r.eggWholeEqPct ? r.eggWholeEqPct.toFixed(1) + "% whole-egg eq" : "";
+
+        $("kansui-note").textContent = !r
+          ? ""
+          : r.kForm === "none"
+            ? "No alkali. Kansui is what makes a wheat noodle a ramen noodle — it yellows the flour's flavones, tightens the gluten and gives that springy bite."
+            : r.kForm === "liquid"
+              ? "Liquid kansui is a solution: only " +
+                fmt(r.kansuiSaltG, 1) +
+                " g of the " +
+                fmt(r.kansuiG, 1) +
+                " g is salt. The rest is water, and it is counted in the hydration above."
+              : r.kForm === "baked"
+                ? "Baked baking soda is pure Na₂CO₃ — about 0.79% matches 1% of a 90:10 kansui powder. Sodium-forward alkali gives more snap and less spring."
+                : r.kForm === "bicarb"
+                  ? "Raw bicarbonate is a much weaker base — you need roughly 1.8× as much as kansui powder, and it brings a soda tang with it."
+                  : "Potassium-forward blends (90:10) give more spring; sodium-forward ones give a firmer, snappier bite.";
+
+        const problems = [];
+        if (r) {
+          if (r.effHydration < 30)
+            problems.push(
+              "at " +
+                r.effHydration.toFixed(1) +
+                "% this will not come together in a domestic mixer — expect a shaggy crumb that has to be sheeted and folded",
+            );
+          if (r.effHydration > 50)
+            problems.push("very slack for ramen — it will stick in the cutter without generous uchiko");
+          if (r.blendProtein < 9.5)
+            problems.push("blend protein is low — the sheet will tear as it thins");
+          if (r.blendProtein > 14.5)
+            problems.push("blend protein is very high — sheeting will fight you, so rest it longer");
+          if (r.alkaliEqPct > 1.8)
+            problems.push("alkali is high enough to taste soapy");
+          if (r.saltPct === 0) problems.push("no salt — the gluten will be slack and the noodle bland");
+          if (r.aspect > 3)
+            problems.push("that is a ribbon, not a ramen noodle — widen the roller gap or use a finer cut");
+        }
+        const dw = $("dough-warn");
+        if (problems.length) {
+          dw.textContent = "⚠ " + problems.join("; ") + ".";
+          dw.hidden = false;
+        } else {
+          dw.hidden = true;
+        }
+
+        renderAnalysis(r);
+        renderGeometry(r);
+        renderXsec(r);
+        renderCrimp(r);
+        renderStyleMatch(r);
+      }
+
+      function setMode(m) {
+        mode = m;
+        $("mode-flour").setAttribute("aria-pressed", String(m === "flour"));
+        $("mode-target").setAttribute("aria-pressed", String(m === "target"));
+        $("target-inputs").hidden = m !== "target";
+        update(true);
+      }
+
+      function setMatchMode(m) {
+        matchMode = m;
+        $("sm-pick").setAttribute("aria-pressed", String(m === "pick"));
+        $("sm-rank").setAttribute("aria-pressed", String(m === "rank"));
+        update(true);
+      }
+
+      function setThickness(mm) {
+        $("thickness").value = mm;
+        $("thickness-num").value = mm;
+      }
+
+      // ---- Wiring ----------------------------------------------------------
+      for (const id of [
+        "water-pct", "salt-pct", "kansui-pct", "kansui-conc", "kansui-ratio",
+        "egg-pct", "colour-pct", "aging", "flour-grams", "servings",
+        "serving-g", "waste",
+      ]) {
+        $(id).addEventListener("input", () => update(true));
+      }
+      for (const id of ["kansui-form", "egg-form", "cut", "crimp", "style-select"]) {
+        $(id).addEventListener("change", () => update(true));
+      }
+
+      // Gram fields write back to the percentage they came from.
+      const gramToPct = (gId, pctId, dp) => {
+        $(gId).addEventListener("change", () => {
+          const r = compute();
+          if (!r) return;
+          $(pctId).value = round((num(gId) / r.flourG) * 100, dp);
+          update(true);
+        });
+      };
+      gramToPct("water-g", "water-pct", 1);
+      gramToPct("salt-g", "salt-pct", 2);
+      gramToPct("kansui-g", "kansui-pct", 2);
+      gramToPct("egg-g", "egg-pct", 1);
+      gramToPct("colour-g", "colour-pct", 3);
+
+      $("thickness").addEventListener("input", () => {
+        $("thickness-num").value = $("thickness").value;
+        update(true);
+      });
+      $("thickness-num").addEventListener("input", () => {
+        $("thickness").value = $("thickness-num").value;
+        update(true);
+      });
+
+      $("mode-flour").addEventListener("click", () => setMode("flour"));
+      $("mode-target").addEventListener("click", () => setMode("target"));
+      $("sm-pick").addEventListener("click", () => setMatchMode("pick"));
+      $("sm-rank").addEventListener("click", () => setMatchMode("rank"));
+      $("load-ref").addEventListener("click", loadReference);
+
+      $("add-flour").addEventListener("click", () => {
+        flours.push({ name: "Plain / all-purpose", share: 0, protein: 10.5, ash: 0.45 });
+        update();
+      });
+
+      $("flour-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = $("nf-name").value.trim();
+        if (!name) return;
+        if (allFlours().some((f) => f.name === name)) {
+          alert("There is already a flour called " + name + ".");
+          return;
+        }
+        customFlours.push({
+          name,
+          protein: Number($("nf-protein").value) || 0,
+          ash: Number($("nf-ash").value) || 0,
+        });
+        saveJSON(LS_FLOURS, customFlours);
+        e.target.reset();
+        $("nf-ash").value = 0.45;
+        renderFlourList();
+        update();
+      });
+
+      $("save-recipe").addEventListener("click", () => {
+        const name = $("recipe-name").value.trim();
+        if (!name) {
+          alert("Give the recipe a name first.");
+          return;
+        }
+        const entry = snapshot(name);
+        const existing = recipes.findIndex((r) => r.name === name);
+        if (existing >= 0) recipes[existing] = entry;
+        else recipes.push(entry);
+        saveJSON(LS_RECIPES, recipes);
+        renderRecipes();
+      });
+
+      // ---- Init ------------------------------------------------------------
+      for (const n of CUT_NUMBERS) {
+        const o = document.createElement("option");
+        o.value = n;
+        o.textContent = "#" + n + " — " + (30 / n).toFixed(2) + " mm wide";
+        if (n === 22) o.selected = true;
+        $("cut").appendChild(o);
+      }
+      CRIMPS.forEach((label, i) => {
+        const o = document.createElement("option");
+        o.value = i;
+        o.textContent = label;
+        if (i === 1) o.selected = true;
+        $("crimp").appendChild(o);
+      });
+      for (const key of Object.keys(BROTHS)) {
+        const grp = document.createElement("optgroup");
+        grp.label = BROTHS[key].label;
+        for (const s of STYLES.filter((s) => s.broth === key)) {
+          const o = document.createElement("option");
+          o.value = s.id;
+          o.textContent = s.label + " (" + s.region + ")";
+          grp.appendChild(o);
+        }
+        $("style-select").appendChild(grp);
+      }
+      $("style-select").value = "tokyo";
+
+      renderFlourList();
+      renderRecipes();
+      update();
+    </script>
+  </body>
+</html>

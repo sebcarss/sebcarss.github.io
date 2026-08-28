@@ -25,6 +25,7 @@ music/scale-charts/index.html Scale Charts utility (fully self-contained)
 food/index.html               "Food" category page
 food/ice-cream-calculator/index.html   Ice Cream Calculator utility
 food/bakers-percentage/index.html      Baker's Percentage Calculator utility
+food/ramen-noodles/index.html          Ramen Noodle Calculator utility
 ```
 
 Each category (e.g. `music/`) has its own `index.html` listing the utilities
@@ -159,3 +160,42 @@ with a `bpc-` prefix, plain DOM JS, `$()` shorthand. Key things to know:
   verdict logic — approximate published figures, safe to tune.
 - Saved recipes persist to localStorage under `bpc:recipes` as full state
   snapshots (`snapshot()`/`applyRecipe()`).
+
+## Ramen Noodle Calculator (`food/ramen-noodles/index.html`)
+
+A single-file tool for designing ramen noodles and identifying which regional
+style a formula fits. Same house style as the other two food utilities: reuses
+`/styles.css` + standard nav/footer, page-local `<style>` with an `rnc-`
+prefix, plain DOM JS, `$()` shorthand, one `update(skipStructure)` entry point.
+Key things to know:
+
+- **A noodle is its dough *and* its cut**, and both feed the style match. Width
+  comes from the Japanese cut number (番手): `width mm = 30 / n`, so a higher
+  number is a *thinner* noodle. Thickness is a separate input (the final roller
+  gap); their ratio gives square / flat / wide (*hira-uchi*).
+- **Effective hydration is the headline, not added water.** Egg and liquid
+  kansui are mostly water, and that water is summed in exactly one place, in
+  `compute()` — the `EGG_FORMS` / `KANSUI_FORMS` tables carry a `water`
+  fraction but nothing else adds hydration, so nothing is double-counted. Same
+  discipline as lactose in the Ice Cream Calculator.
+- **All alkali reduces to one number.** Powdered kansui (with an adjustable
+  K₂CO₃:Na₂CO₃ ratio), liquid kansui (a solution — dose ≠ salts), baked baking
+  soda and bicarbonate are all converted to a carbonate-equivalent percentage
+  of a 90:10 kansui powder (`ALKALI_REF`), which is the only alkali figure the
+  styles are ever scored against. The `CARB_BICARB` 0.35 factor is empirical.
+- **Styles** live in `STYLES` — 22 regional profiles, each a set of `[lo, hi]`
+  bands, grouped in the picker by the four broad `BROTHS` bands. `ATTRS` drives
+  both the delta table and the ranking, holding each attribute's weight and the
+  tolerance over which a miss decays to zero.
+- **Scoring** (`scoreAttr`) gives 1.0 at the dead centre of a band and 0.98 at
+  its edges before decaying linearly. That tiny in-band slope exists purely to
+  break ties between overlapping styles — it's what makes "Load reference
+  formula" round-trip to rank its own style first for all 22.
+- **Flour blend rows carry their own protein and ash**, and vital wheat gluten
+  and starches live in that table rather than as separate extras, because they
+  shift the weighted blend protein that styles score against.
+- Boil time, predicted colour and the three texture bars are openly labelled
+  heuristics; `COOK_K` is calibrated against two known anchors (see the comment).
+- Custom flours and saved recipes persist to localStorage under `rnc:flours`
+  and `rnc:recipes`; recipes are full state snapshots
+  (`snapshot()`/`applyRecipe()`).
