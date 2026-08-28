@@ -381,6 +381,25 @@
         font-variant-numeric: normal;
       }
 
+      /* Equipment reality check */
+      .rnc-kit {
+        font-size: 0.85rem;
+        margin: 0.25rem 0 0;
+        padding: 0.5rem 0.65rem;
+        border-radius: 8px;
+        background: #f9fafb;
+        border: 1px solid var(--border);
+        line-height: 1.45;
+      }
+
+      .rnc-kit .have {
+        color: #15803d;
+      }
+
+      .rnc-kit .lack {
+        color: #b45309;
+      }
+
       /* Noodle preview */
       .rnc-preview {
         margin-top: 0.5rem;
@@ -762,24 +781,22 @@
           <section class="rnc-panel">
             <h2>Cut</h2>
             <div class="rnc-params">
-              <label>Cut number (番手)
+              <label style="flex: 1 1 100%">Cutter (番手)
                 <select id="cut"></select>
               </label>
-              <label>Thickness mm
-                <input type="number" id="thickness-num" min="0.6" max="4" step="0.05" value="1.25" />
-              </label>
-              <label>&nbsp;
-                <input type="range" id="thickness" min="0.6" max="4" step="0.05" value="1.25" aria-label="Thickness slider" />
+              <label>Roller setting
+                <select id="thickness"></select>
               </label>
               <label>Crimp
                 <select id="crimp"></select>
               </label>
             </div>
+            <p class="rnc-kit" id="kit-note"></p>
             <p class="rnc-note">
               Cut number is how many blades divide 30 mm, so a higher number is
-              a <em>thinner</em> noodle: width = 30 ÷ n. Thickness is set
-              independently by the final roller gap — the ratio of the two is
-              what makes a noodle square, flat or wide.
+              a <em>thinner</em> noodle: width = 30 ÷ n. Thickness comes from
+              the roller gap instead — the ratio of the two is what makes a
+              noodle square, flat or wide.
             </p>
 
             <table class="rnc-guide-table" id="geom-table"></table>
@@ -977,6 +994,36 @@
       const CUT_NUMBERS = [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30];
       const CRIMPS = ["Straight", "Light wave", "Wavy", "Very wavy"];
 
+      // -- The machine on the bench. Swap these two tables for another roller
+      // and cutter set and the whole equipment reality check follows.
+
+      // KitchenAid 5KSMPRA sheet roller. The manual gives each setting a use,
+      // never a gap — KitchenAid has never published the thicknesses — so these
+      // millimetre figures are inferred from the manual's own guidance (3 for
+      // thick kluski, 4 for egg noodles, 7–8 for capellini) and they vary from
+      // unit to unit. Roll a sheet, measure it with calipers, and edit the mm
+      // column here to calibrate: everything downstream reads from it.
+      const ROLLER = [
+        { setting: 1, mm: 3.0, use: "Kneading, first pass" },
+        { setting: 2, mm: 2.4, use: "Kneading and thinning" },
+        { setting: 3, mm: 1.9, use: "Thick kluski noodles" },
+        { setting: 4, mm: 1.5, use: "Egg noodles" },
+        { setting: 5, mm: 1.2, use: "Lasagne, fettuccine, linguine fini" },
+        { setting: 6, mm: 0.9, use: "Tortellini, thin fettuccine" },
+        { setting: 7, mm: 0.7, use: "Thin fettuccine, fine linguine" },
+        { setting: 8, mm: 0.5, use: "Angel hair, capellini" },
+      ];
+
+      // Cutters actually owned (KitchenAid 5KSMPSA set). Anything else in the
+      // cutter list has to be hand-cut or bought.
+      const OWNED_CUTTERS = [
+        { label: "Spaghetti cutter", widthMm: 2.0 },
+        { label: "Fettuccine cutter", widthMm: 6.5 },
+      ];
+      const cutFor = (widthMm) => 30 / widthMm;
+      const ownedCutter = (cut) =>
+        OWNED_CUTTERS.find((c) => Math.abs(cutFor(c.widthMm) - cut) < 0.005);
+
       const HYDRATION_BANDS = [
         { from: 24, to: 30, label: "Hakata / barikata — sheet-and-fold only" },
         { from: 30, to: 35, label: "Thin tonkotsu & firm shoyu noodles" },
@@ -1149,6 +1196,10 @@
       const fmt = (g, dp = 0) =>
         g.toLocaleString("en-GB", { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
+      // The owned cutters land on fractional cut numbers (6.5 mm is #4.6), so
+      // only the standard whole-number blades print bare.
+      const fmtCut = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
       const mmss = (s) =>
         s < 60
           ? Math.round(s) + " s"
@@ -1226,7 +1277,8 @@
         // -- Geometry.
         const cut = Number($("cut").value);
         const widthMm = 30 / cut;
-        const thicknessMm = Number($("thickness").value);
+        const roller = rollerFor(Number($("thickness").value));
+        const thicknessMm = roller.mm;
         const aspect = widthMm / thicknessMm;
         const areaMm2 = widthMm * thicknessMm;
         const shapeLabel =
@@ -1287,7 +1339,7 @@
           kForm, kansuiG, kansuiSaltG, alkaliEqPct, kRatioK, carbPerG,
           eggForm: $("egg-form").value, eggG, eggFatG, eggWholeEqPct,
           saltG, colourG, doughG, usableG, servings, servingG, wastePct,
-          cut, widthMm, thicknessMm, aspect, areaMm2, shapeLabel, crimpIdx,
+          cut, widthMm, roller, thicknessMm, aspect, areaMm2, shapeLabel, crimpIdx,
           agingHours, cook, colourRgb, yellow, texture,
         };
       }
@@ -1603,13 +1655,70 @@
         return el;
       };
 
+      // Which of the 22 styles this cutter width can actually reach, ignoring
+      // everything the dough controls.
+      const stylesForCut = (cut) =>
+        STYLES.filter((s) => cut >= s.cut[0] && cut <= s.cut[1]).map((s) => s.label);
+
+      function renderKit(r) {
+        const el = $("kit-note");
+        el.textContent = "";
+        if (!r) return;
+
+        const line = (cls, text) => {
+          const p = document.createElement("div");
+          if (cls) p.className = cls;
+          p.textContent = text;
+          el.appendChild(p);
+        };
+
+        line(
+          "have",
+          "Roller " + r.roller.setting + " ≈ " + r.roller.mm.toFixed(2) +
+            " mm — " + r.roller.use.toLowerCase() + ".",
+        );
+
+        const owned = ownedCutter(r.cut);
+        if (owned) {
+          line("have", "✓ " + owned.label + " — you have this blade.");
+        } else {
+          const nearest = OWNED_CUTTERS.reduce((best, c) =>
+            Math.abs(c.widthMm - r.widthMm) < Math.abs(best.widthMm - r.widthMm) ? c : best,
+          );
+          line(
+            "lack",
+            "⚠ No blade this size on the 5KSMPSA — cut by hand, or buy a #" +
+              fmtCut(r.cut) + ". Closest you own is the " +
+              nearest.label.toLowerCase() + " at " + nearest.widthMm.toFixed(2) + " mm.",
+          );
+        }
+
+        const reach = stylesForCut(r.cut);
+        const listed = reach.slice(0, 5).join(", ");
+        line(
+          "",
+          reach.length
+            ? "At this width: " + listed +
+              (reach.length > 5 ? " and " + (reach.length - 5) + " more." : ".")
+            : "No style in the list is cut this wide — the nearest are " +
+              STYLES.map((s) => ({
+                s,
+                d: Math.min(Math.abs(s.cut[0] - r.cut), Math.abs(s.cut[1] - r.cut)),
+              }))
+                .sort((a, b) => a.d - b.d)
+                .slice(0, 2)
+                .map((z) => z.s.label)
+                .join(" and ") + ".",
+        );
+      }
+
       function renderGeometry(r) {
         const gt = $("geom-table");
         gt.textContent = "";
         if (!r) return;
         const rows = [
-          ["Width", r.widthMm.toFixed(2) + " mm (30 ÷ " + r.cut + ")"],
-          ["Thickness", r.thicknessMm.toFixed(2) + " mm"],
+          ["Width", r.widthMm.toFixed(2) + " mm (30 ÷ " + fmtCut(r.cut) + ")"],
+          ["Thickness", r.thicknessMm.toFixed(2) + " mm (roller " + r.roller.setting + ")"],
           ["Aspect (w : t)", r.aspect.toFixed(2) + " : 1 — " + r.shapeLabel],
           ["Cross-section", r.areaMm2.toFixed(2) + " mm²"],
         ];
@@ -1771,7 +1880,7 @@
 
       function fmtValue(a, v) {
         if (a.crimp) return CRIMPS[v];
-        if (a.cut) return "#" + v;
+        if (a.cut) return "#" + fmtCut(v);
         return v.toFixed(a.dp) + a.unit;
       }
 
@@ -2099,6 +2208,7 @@
         }
 
         renderAnalysis(r);
+        renderKit(r);
         renderGeometry(r);
         renderXsec(r);
         renderCrimp(r);
@@ -2120,9 +2230,14 @@
         update(true);
       }
 
+      // The roller is the only thickness control, so a target that came from a
+      // style reference or an older saved recipe snaps to the nearest gap the
+      // machine can actually produce.
+      const rollerFor = (mm) =>
+        ROLLER.reduce((best, s) => (Math.abs(s.mm - mm) < Math.abs(best.mm - mm) ? s : best));
+
       function setThickness(mm) {
-        $("thickness").value = mm;
-        $("thickness-num").value = mm;
+        $("thickness").value = rollerFor(mm).mm;
       }
 
       // ---- Wiring ----------------------------------------------------------
@@ -2133,7 +2248,9 @@
       ]) {
         $(id).addEventListener("input", () => update(true));
       }
-      for (const id of ["kansui-form", "egg-form", "cut", "crimp", "style-select"]) {
+      for (const id of [
+        "kansui-form", "egg-form", "cut", "thickness", "crimp", "style-select",
+      ]) {
         $(id).addEventListener("change", () => update(true));
       }
 
@@ -2151,15 +2268,6 @@
       gramToPct("kansui-g", "kansui-pct", 2);
       gramToPct("egg-g", "egg-pct", 1);
       gramToPct("colour-g", "colour-pct", 3);
-
-      $("thickness").addEventListener("input", () => {
-        $("thickness-num").value = $("thickness").value;
-        update(true);
-      });
-      $("thickness-num").addEventListener("input", () => {
-        $("thickness").value = $("thickness-num").value;
-        update(true);
-      });
 
       $("mode-flour").addEventListener("click", () => setMode("flour"));
       $("mode-target").addEventListener("click", () => setMode("target"));
@@ -2207,12 +2315,38 @@
       });
 
       // ---- Init ------------------------------------------------------------
-      for (const n of CUT_NUMBERS) {
+      const mkOption = (value, text, selected) => {
         const o = document.createElement("option");
-        o.value = n;
-        o.textContent = "#" + n + " — " + (30 / n).toFixed(2) + " mm wide";
-        if (n === 22) o.selected = true;
-        $("cut").appendChild(o);
+        o.value = value;
+        o.textContent = text;
+        if (selected) o.selected = true;
+        return o;
+      };
+
+      const ownedGrp = document.createElement("optgroup");
+      ownedGrp.label = "On your KitchenAid (5KSMPSA)";
+      for (const c of OWNED_CUTTERS) {
+        ownedGrp.appendChild(
+          mkOption(
+            cutFor(c.widthMm),
+            c.label + " — " + c.widthMm.toFixed(2) + " mm (#" + fmtCut(cutFor(c.widthMm)) + ")",
+            c.widthMm === 2.0,
+          ),
+        );
+      }
+      $("cut").appendChild(ownedGrp);
+
+      const stdGrp = document.createElement("optgroup");
+      stdGrp.label = "Japanese cutters — hand-cut or buy";
+      for (const n of CUT_NUMBERS) {
+        stdGrp.appendChild(mkOption(n, "#" + n + " — " + (30 / n).toFixed(2) + " mm wide"));
+      }
+      $("cut").appendChild(stdGrp);
+
+      for (const s of ROLLER) {
+        $("thickness").appendChild(
+          mkOption(s.mm, s.setting + " — ≈" + s.mm.toFixed(2) + " mm · " + s.use, s.setting === 5),
+        );
       }
       CRIMPS.forEach((label, i) => {
         const o = document.createElement("option");

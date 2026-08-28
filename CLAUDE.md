@@ -171,8 +171,29 @@ Key things to know:
 
 - **A noodle is its dough *and* its cut**, and both feed the style match. Width
   comes from the Japanese cut number (番手): `width mm = 30 / n`, so a higher
-  number is a *thinner* noodle. Thickness is a separate input (the final roller
-  gap); their ratio gives square / flat / wide (*hira-uchi*).
+  number is a *thinner* noodle. Thickness comes from the roller gap; their
+  ratio gives square / flat / wide (*hira-uchi*).
+- **The Cut panel is modelled on the kit actually on the bench** — a KitchenAid
+  5KSMPRA sheet roller and the 5KSMPSA cutter set — via two tables, `ROLLER`
+  and `OWNED_CUTTERS`. Swap those and everything downstream follows.
+  - Thickness is chosen as a *roller setting*, not free millimetres, so it can
+    only ever be a gap the machine can produce. `setThickness()` snaps any
+    off-grid target (a style reference, an older saved recipe) to the nearest
+    setting via `rollerFor()`.
+  - KitchenAid has never published the gap for each setting, so `ROLLER`'s mm
+    column is inferred from the manual's own use-guidance (3 = thick kluski,
+    4 = egg noodles, 7–8 = capellini) and varies unit to unit. It is the single
+    place to recalibrate after measuring a sheet with calipers.
+  - The cutter list is two `<optgroup>`s: the owned blades (spaghetti 2 mm =
+    #15, fettuccine 6.5 mm = #4.6 — note the fractional cut numbers, hence
+    `fmtCut()`) and the standard Japanese sizes, which have to be hand-cut or
+    bought. `renderKit()` is the reality check: which roller setting, whether
+    that blade is owned, and which styles the width can reach.
+  - `loadReference()` deliberately keeps picking from `CUT_NUMBERS`, not the
+    owned blades — a reference formula is what the style wants, and the kit
+    note separately says whether it can be cut. Every style's thickness band is
+    reachable on some roller setting, which is why the round-trip survives the
+    snapping.
 - **Effective hydration is the headline, not added water.** Egg and liquid
   kansui are mostly water, and that water is summed in exactly one place, in
   `compute()` — the `EGG_FORMS` / `KANSUI_FORMS` tables carry a `water`
