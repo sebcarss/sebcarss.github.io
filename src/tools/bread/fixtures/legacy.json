@@ -1,0 +1,10 @@
+{
+  "_note": "Outputs of the legacy food/bakers-percentage compute()/computePreferment() captured in Node. Extras in the legacy tool carried no composition, so effective hydration is new and not compared.",
+  "straight": { "flourG": 500, "totalPct": 173, "waterG": 350, "saltG": 10, "yeastG": 5, "totalG": 865 },
+  "poolishTarget": { "flourG": 920.5983889528192, "totalPct": 173.8, "waterG": 626.006904487917, "saltG": 18.411967779056383, "yeastG": 7.3647871116225545, "extraG": 27.617951668584574, "totalG": 1600,
+    "pref": { "flourG": 276.1795166858457, "waterG": 276.1795166858457, "yeastG": 0.2761795166858457, "totalG": 552.6352128883773, "finalFlourG": 644.4188722669735, "finalWaterG": 349.8273878020713, "finalYeastG": 7.0886075949367084 } },
+  "levain": { "flourG": 1000, "totalPct": 186, "waterG": 750, "saltG": 20, "yeastG": 0, "totalG": 1860,
+    "pref": { "flourG": 200, "waterG": 200, "yeastG": 0, "totalG": 400, "finalFlourG": 800, "finalWaterG": 550, "finalYeastG": 0 } },
+  "biga": { "flourG": 600, "totalPct": 164.7, "waterG": 372, "saltG": 13.2, "yeastG": 3, "totalG": 988.2,
+    "pref": { "flourG": 240, "waterG": 120, "yeastG": 0.48, "totalG": 360.48, "finalFlourG": 360, "finalWaterG": 252, "finalYeastG": 2.52 } }
+}

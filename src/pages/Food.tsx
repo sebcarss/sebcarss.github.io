@@ -1,4 +1,6 @@
 import { Card } from "@/components/Card";
+import { Backup } from "./Backup";
+import "@/styles/tools.css";
 
 export const FOOD_CARDS = (
   <>
@@ -27,6 +29,7 @@ export function Food() {
       <section className="category">
         <div className="cards">{FOOD_CARDS}</div>
       </section>
+      <Backup />
     </main>
   );
 }

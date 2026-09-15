@@ -1,0 +1,15 @@
+{
+  "_note": "Outputs of the legacy food/ice-cream-calculator compute() for three recipes, captured by running its BUILTINS + compute() in Node. Ingredient names are legacy names mapped to ids in the test. Deviations in the new engine come only from the corrected per-100 g figures (egg yolk fat 28 vs 27, butter lactose, cocoa split) and are asserted with a tolerance.",
+  "default": {
+    "rows": [["whole-milk", 500], ["double-cream", 250], ["sugar", 130], ["skimmed-milk-powder", 40], ["egg-yolk", 80]],
+    "expect": { "grams": 1000, "fat": 16.0, "sugar": 13.0, "msnf": 9.44, "other": 1.84, "solids": 40.28, "pod": 13.82, "pac": 18.14 }
+  },
+  "gelato": {
+    "rows": [["whole-milk", 600], ["double-cream", 100], ["sugar", 120], ["dextrose", 30], ["skimmed-milk-powder", 50], ["glucose-syrup-de42", 20]],
+    "expect": { "grams": 920, "fat": 7.62, "sugar": 18.04, "msnf": 11.52, "other": 0, "solids": 37.18, "pod": 17.11, "pac": 27.11 }
+  },
+  "choc": {
+    "rows": [["whole-milk", 450], ["whipping-cream", 200], ["sugar", 110], ["cocoa-powder-22", 30], ["dark-chocolate-70", 60], ["honey", 20], ["egg-yolk", 40]],
+    "expect": { "grams": 910, "fat": 14.37, "sugar": 15.80, "msnf": 5.63, "other": 5.33, "solids": 41.14, "pod": 16.80, "pac": 20.48 }
+  }
+}
