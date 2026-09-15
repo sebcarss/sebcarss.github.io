@@ -6,6 +6,7 @@ import { Home } from "@/pages/Home";
 import { Food } from "@/pages/Food";
 import { IceCream } from "@/tools/ice-cream/IceCream";
 import { Bread } from "@/tools/bread/Bread";
+import { Ramen } from "@/tools/ramen/Ramen";
 
 vi.mock("virtual:pwa-register/react", () => ({
   useRegisterSW: () => ({ needRefresh: [false, () => {}], offlineReady: [false, () => {}], updateServiceWorker: async () => {} }),
@@ -61,5 +62,20 @@ describe("pages render", () => {
     fireEvent.click(screen.getByText("Target dough"));
     expect(screen.getByLabelText("Loaves")).toBeTruthy();
     expect(screen.getByText(/needs .* g flour/)).toBeTruthy();
+  });
+
+  it("ramen: picking yolk seeds a percentage and changes the analysis", () => {
+    at("/food/ramen-noodles", <Ramen />);
+    const before = screen.getByText(/g total water/).textContent;
+    fireEvent.change(screen.getByLabelText("Egg form"), { target: { value: "egg-yolk" } });
+    const eggPct = screen.getByLabelText("Egg percent") as HTMLInputElement;
+    expect(Number(eggPct.value)).toBeGreaterThan(0);
+    expect(screen.getByText(/g total water/).textContent).not.toBe(before);
+    expect(screen.getByText(/10% whole-egg eq/)).toBeTruthy();
+    fireEvent.click(screen.getByText("What did I make?"));
+    expect(screen.getAllByText(/%$/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("Match a style"));
+    fireEvent.click(screen.getByText("Load reference formula"));
+    expect(screen.getByText(/100% match|9\d% match/)).toBeTruthy();
   });
 });

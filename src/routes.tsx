@@ -5,6 +5,7 @@ import { Food } from "@/pages/Food";
 import { NotFound } from "@/pages/NotFound";
 import { IceCream } from "@/tools/ice-cream/IceCream";
 import { Bread } from "@/tools/bread/Bread";
+import { Ramen } from "@/tools/ramen/Ramen";
 
 // Keep the route list in sync with scripts/postbuild.mjs.
 export const router = createBrowserRouter([
@@ -15,6 +16,7 @@ export const router = createBrowserRouter([
       { path: "/food", element: <Food /> },
       { path: "/food/ice-cream-calculator", element: <IceCream /> },
       { path: "/food/bakers-percentage", element: <Bread /> },
+      { path: "/food/ramen-noodles", element: <Ramen /> },
       { path: "*", element: <NotFound /> },
     ],
   },
