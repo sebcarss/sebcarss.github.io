@@ -4,219 +4,105 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Seb Carss's personal homepage, served from sebcarss.github.io — a plain static
-HTML/CSS site with no build step, no dependencies, and no package.json. Push to
-`master` and GitHub Pages serves the tree as-is (`.nojekyll` disables Jekyll
-processing).
+Seb Carss's personal homepage at sebcarss.github.io. Two halves:
 
-There is no test/lint/build tooling in this repo. To check a change, open the
-HTML file directly in a browser or serve the directory with any static file
-server (e.g. `python3 -m http.server`).
+- **Food calculators** — a Vite + React 19 + TypeScript single-page app in
+  `src/`, installable as a PWA (`vite-plugin-pwa`) so it works offline on a
+  phone. Routes: `/`, `/food/`, `/food/ice-cream-calculator/`,
+  `/food/bakers-percentage/`, `/food/ramen-noodles/`.
+- **Music tools** — `public/music/**` (Tab Caster, Scale Charts). Plain,
+  self-contained static HTML that the build copies through unchanged. They
+  link `/styles.css`, which lives at `public/styles.css`. Don't refactor them
+  into the React app; they only make sense cast to a TV from a desktop.
 
-## Structure
+Commands: `npm run dev`, `npm test` (vitest), `npm run build` (runs `tsc
+--noEmit` first, then `scripts/postbuild.mjs`), `npm run preview`,
+`npm run dev:phone` (HTTPS on the LAN). Deployed by
+`.github/workflows/deploy.yml` on push to `master` (Pages source must be
+"GitHub Actions"). `dist/` is generated; never commit it.
 
-```
-index.html                    Homepage — lists categories and utility cards
-styles.css                    Shared styles for every page (nav, cards, footer)
-404.html                      Not-found page
-music/index.html              "Music" category page
-music/tab-caster/index.html   Tab Caster utility (fully self-contained)
-music/scale-charts/index.html Scale Charts utility (fully self-contained)
-food/index.html               "Food" category page
-food/ice-cream-calculator/index.html   Ice Cream Calculator utility
-food/bakers-percentage/index.html      Baker's Percentage Calculator utility
-food/ramen-noodles/index.html          Ramen Noodle Calculator utility
-```
+## Architecture rules
 
-Each category (e.g. `music/`) has its own `index.html` listing the utilities
-in that category, mirroring the cards shown on the homepage.
+- **Engines are pure.** Each tool has `engine.ts` exporting
+  `compute(state, lookup) → Result | null` with no DOM or React. The page
+  (`<Tool>.tsx`) owns state via `useDraft()` (a persisted `useReducer`) and
+  calls `compute` in a `useMemo`. Every bug fix gets a test in
+  `engine.test.ts`; `fixtures/legacy.json` holds outputs captured from the old
+  static pages, and the parity tests assert against them with a documented
+  tolerance for deliberate changes.
+- **One ingredient database** (`src/lib/ingredients/`). `Ingredient` = id,
+  name, category, `tools` tags, `solids` per 100 g (fat, protein, sugars,
+  lactose, ash, other — water is derived as the remainder), optional `sweet`
+  (POD/PAC, own sugars only), `egg` (wholeEq by solids, colour) and `yeast`
+  (instantEq) facets. `derive.ts` has `water()`, `msnf()` (dairy only:
+  protein+lactose+ash) and `otherSolids()`. Built-ins live in `builtins.ts`
+  with a test that solids ≤ 100. Custom ingredients persist under
+  `sc:ingredients:v1`, are referenced by **id**, and a missing id renders as
+  "(missing)" rather than being dropped.
+- **Recipes** (`src/lib/recipes/store.ts`): `SavedRecipe { id, tool, name,
+  notes, createdAt, updatedAt, schema, state }` under `sc:recipes:v1`,
+  zod-validated leniently (bad entries skipped, never crash). Each tool's
+  `state.ts` has a zod schema, `SCHEMA_VERSION`, `parseState()` and the
+  reducer. Drafts autosave under `sc:draft:<tool>`; the current recipe
+  id/name/notes under `sc:draft-meta:<tool>`.
+- **Legacy migration** (`src/lib/recipes/migrate.ts` + `tools/*/migrate.ts`)
+  runs once (flag `sc:migrated:v1`), reads the old `icc:`, `bpc:`, `rnc:`
+  keys, maps names → ids and turns unknown names into custom ingredients. Old
+  keys are never deleted.
+- **Export** (`src/lib/export/`): each tool's `text.ts` builds a fixed-width
+  plain-text block (`table()` helper); `share.ts` uses the Web Share API with
+  clipboard fallback. `RecipeBar` wires save / save-as / load / delete /
+  share / copy / print / notes for every tool.
+- **UI** is plain CSS with tokens in `src/styles/global.css` (light + dark via
+  `prefers-color-scheme`), shared tool classes in `tools.css`, and a small set
+  of components. `NumberInput` keeps its own text while focused; use
+  `mode="commit"` for derived gram fields that write back to a %.
+- `scripts/postbuild.mjs` has the route list — keep it in sync with
+  `src/routes.tsx` when adding a tool. Music is excluded from the service
+  worker precache (`globIgnores`) and from the navigate fallback.
 
-## Adding a new utility
+## Adding a food tool
 
-1. Drop the self-contained app at `<category>/<name>/index.html` — it should
-   not depend on anything outside its own file (see Tab Caster below for why).
-2. Add a `.card` link to it on the homepage `index.html`, and on the relevant
-   `<category>/index.html`.
-3. If it's a new category, add a nav link in `styles.css`-styled pages and,
-   optionally, a `<category>/index.html`.
-4. Reuse `styles.css` and the existing nav/footer markup for consistency
-   unless the utility needs a fully custom layout (as Tab Caster does).
+1. `src/tools/<name>/` with `data.ts` (tables), `state.ts` (zod schema,
+   reducer, defaults), `engine.ts` (pure), `engine.test.ts`, `text.ts`
+   (export + list summary), `migrate.ts` (or none), `<Name>.tsx` (page using
+   `ToolPage`, `Panel`, `RecipeBar`, `CustomIngredients`).
+2. Tag the ingredients it can use with its `Tool` id in `builtins.ts`.
+3. Add the route in `src/routes.tsx`, the path in `scripts/postbuild.mjs`, a
+   card in `src/pages/Food.tsx`, and a smoke test in `src/test/render.test.tsx`.
 
-## Tab Caster (`music/tab-caster/index.html`)
+## Ice Cream (`src/tools/ice-cream/`)
 
-A single self-contained HTML file (no external requests at runtime) that
-converts an Ultimate Guitar PDF into a single-screen, TV-castable tab sheet.
-Key things to know before touching it:
+Sums composition per row, adds lactose POD (0.16) / PAC (1.0) exactly once
+from `solids.lactose`, and reports fat / sugar (non-lactose) / MSNF / other /
+total solids / POD / PAC against `targets.ts` (ice cream, gelato, sorbet). New
+outputs: initial freezing point from PAC as sucrose-equivalent molality
+(Kf 1.86), ice fraction at −12 °C → hardness label, lactose as % of the water
+phase with a sandiness warning above 10 %.
 
-- **pdf.js is embedded inline** (minified, versioned in a comment as
-  "pdf.js 3.11.174") in a `<script>` block near the top of the file, including
-  the worker (exposed as `globalThis.pdfjsWorker`), so the app works fully
-  offline with no network requests or separate worker file. Don't try to
-  "clean this up" into a separate file/CDN reference — self-containment is
-  intentional.
-- The actual application logic lives in the second `<script>` block, after
-  the embedded library. It has three main parts:
-  - **Segmentation** (`segmentPage`): recursive XY-cut algorithm that slices
-    a rendered PDF page into content blocks along whitespace gaps, so the
-    original Ultimate Guitar layout is preserved. Two-column pages need the
-    column-grouping pass inside `cut`: bands whose ink straddles a shared
-    vertical gutter (plus one-sided neighbours whose whitespace spans the
-    cut point) are cut at the gutter *first*, so blocks come out in
-    column-major reading order (left column top-to-bottom, then right)
-    instead of interleaved. Don't "simplify" that pass away — aligned
-    section gaps in the two columns otherwise masquerade as full-width
-    horizontal cuts.
-  - **Classification & tinting** (`classifyBands`, `tintAll`): classifies
-    each line of a block as chord/lyric/section/neutral using pixel
-    statistics (stroke weight for bold chord names, tall thin glyphs for
-    `[section]` brackets), then recolors ink pixels accordingly. Palettes
-    for light/dark are in `PALETTES`.
-  - **Layout & controls** (`buildSheet`, `applyLayout`, `autoLayout`,
-    keyboard shortcuts, drag-and-drop, fullscreen handling): arranges
-    segmented blocks into a CSS multi-column sheet and picks the
-    column count/zoom that best fills the screen.
-  - **Playlist** (`setPlaylist`, `playSong`): multi-select or drop a whole
-    folder of PDFs; files are sorted by name into a toolbar `<select>`
-    (shown only for >1 song) and switched with ←/→ or [ ] — songs re-parse
-    on switch, nothing is cached. The toolbar also has a "‹ Home" link
-    back to the homepage.
-- Everything is plain DOM/canvas JS — no framework, no build step. `$()` is
-  a `getElementById` shorthand defined near the top of the app script.
+## Baker's Percentage (`src/tools/bread/`)
 
-## Scale Charts (`music/scale-charts/index.html`)
+Percentages are the source of truth; gram fields write back in flour-weight
+mode and are read-only in target-dough mode. Ingredient rows carry
+composition, so **effective hydration** = added water + water inside every
+non-flour ingredient (flour moisture never counts). Yeast is typed
+(instant / active dry / fresh) via `yeast.instantEq`; guidance uses the
+instant-equivalent. Preferments (`data.ts PREFERMENTS`): poolish, biga,
+levain (optional starter seed split into flour+water), pâte fermentée (same
+hydration and salt as the dough, yeast taken from it), sponge. The preferment
+is a split of the same totals; `pref.yeastSeparate` adds its yeast on top
+instead. Flour shares are normalised by their sum with a warning when ≠ 100.
 
-A single self-contained HTML file (no external requests) showing, for one
-scale type at a time, a grid of every key (rows) against every scale degree
-(columns), with the note and the diatonic chord in each cell. Built for
-casting to a TV, so it shares Tab Caster's chrome: dark toolbar, orange
-accent, `body.dark` / `body.fs` classes, fullscreen with a toolbar that
-reappears near the top edge, `--barH` kept in sync by a `ResizeObserver`.
-Key things to know:
+## Ramen Noodles (`src/tools/ramen/`)
 
-- **Spelling is computed, not tabulated.** `scaleNotes()` gives each degree
-  its own letter name (root letter + `letterSteps[i]`) and derives the
-  accidental from the semitone interval, so C major is C D E F G A B and
-  D♭ major is D♭ E♭ F G♭ A♭ B♭ C — never enharmonic mush. `pickRoots()`
-  then chooses between the enharmonic spellings in `ROOT_CANDIDATES`
-  (e.g. D♭ vs C♯) by picking whichever spells the scale with the fewest
-  accidentals, double accidentals heavily penalised. Consequence: the 12
-  row labels change with the selected scale (D♭ major, but C♯ natural
-  minor). That's intended.
-- **Scales** live in `SCALES` (7-note modes plus harmonic/melodic minor,
-  and pentatonic/blues). A scale with `degLabels` is note-only: it has no
-  diatonic chords, sets `body.nochords`, and needs `letterSteps` because
-  its degrees don't advance one letter at a time.
-- **Chords** come from `chordAt()` (stacked thirds within the scale) and
-  `romanFor()` (numeral case + °/ø/+ and seventh suffixes). Roman numerals
-  are a property of the scale, not the key, so they render once in `<thead>`.
-- **Progressions**: `progression` is an array of 1-based degrees, set from
-  the text box (`parseProgression()` accepts `1 4 5` or `ii V I`), the
-  `PRESETS` list, or number keys 1–7. Each step gets a colour from
-  `STEP_COLOURS`, passed into CSS as a `--c` rgb triple on the cell. When a
-  progression is set, a trailing column (`th.progHead` / `td.prog`) spells it
-  out per key as coloured `.chip` pills — C major with I–V–vi–IV reads
-  "C G Am F". Chips show the chord symbol, falling back to the bare note
-  under `body.notes-only` or `body.nochords`.
-- **Sizing**: `fit()` measures the table at a known font size and scales
-  `#chart`'s `font-size` so it fills the viewport; every inner dimension is
-  in `em` so the whole grid scales together. `autoFit` stays true until the
-  user touches the zoom slider or +/-.
-
-## Ice Cream Calculator (`food/ice-cream-calculator/index.html`)
-
-A single-file recipe balancing tool: pick ingredients and amounts in grams,
-and it computes fat / sugar / MSNF / other solids / total solids percentages
-plus POD (relative sweetness) and PAC (anti-freezing power), compared against
-target ranges for ice cream and gelato. Unlike Tab Caster it reuses
-`/styles.css` and the standard nav/footer, with page-specific styles inline.
-Key things to know:
-
-- **Ingredient data** (`BUILTINS`) is per 100 g of ingredient. `pod`/`pac`
-  cover only the ingredient's own sugars — the lactose inside MSNF is added
-  globally in `compute()` (`LACTOSE_*` constants), so don't add lactose
-  contributions to individual dairy entries or it will be double-counted.
-- **Target ranges** live in `BASELINES` (ice cream vs gelato); metric labels
-  and meter scales in `METRICS`. All figures are approximate published ranges
-  and safe to tune.
-- Custom ingredients and saved recipes persist to localStorage under
-  `icc:ingredients` and `icc:recipes`; recipes reference ingredients by name.
-- Plain DOM JS, no dependencies. `$()` is a `getElementById` shorthand.
-
-## Baker's Percentage Calculator (`food/bakers-percentage/index.html`)
-
-A single-file bread-dough tool built on baker's percentages (flour = 100%,
-everything else a % of total flour). Same house style as the ice cream
-calculator: reuses `/styles.css` + standard nav/footer, page-local `<style>`
-with a `bpc-` prefix, plain DOM JS, `$()` shorthand. Key things to know:
-
-- **Percentages are the source of truth**; gram inputs write back to the %
-  on change ("flour weight" mode only — in "target dough" mode gram fields
-  are read-only and the flour weight is derived from loaves × g/loaf).
-- **Preferments** (`PREFERMENTS`): poolish/biga/levain split the recipe into
-  Preferment and Final dough tables. The preferment's flour, water and yeast
-  pinch are subtracted from the overall totals, so the grand totals and
-  percentages never change; levain zeroes/disables the commercial yeast row.
-- **Guidance ranges** live in `HYDRATION_BANDS`, `SALT_TARGET` and the yeast
-  verdict logic — approximate published figures, safe to tune.
-- Saved recipes persist to localStorage under `bpc:recipes` as full state
-  snapshots (`snapshot()`/`applyRecipe()`).
-
-## Ramen Noodle Calculator (`food/ramen-noodles/index.html`)
-
-A single-file tool for designing ramen noodles and identifying which regional
-style a formula fits. Same house style as the other two food utilities: reuses
-`/styles.css` + standard nav/footer, page-local `<style>` with an `rnc-`
-prefix, plain DOM JS, `$()` shorthand, one `update(skipStructure)` entry point.
-Key things to know:
-
-- **A noodle is its dough *and* its cut**, and both feed the style match. Width
-  comes from the Japanese cut number (番手): `width mm = 30 / n`, so a higher
-  number is a *thinner* noodle. Thickness comes from the roller gap; their
-  ratio gives square / flat / wide (*hira-uchi*).
-- **The Cut panel is modelled on the kit actually on the bench** — a KitchenAid
-  5KSMPRA sheet roller and the 5KSMPSA cutter set — via two tables, `ROLLER`
-  and `OWNED_CUTTERS`. Swap those and everything downstream follows.
-  - Thickness is chosen as a *roller setting*, not free millimetres, so it can
-    only ever be a gap the machine can produce. `setThickness()` snaps any
-    off-grid target (a style reference, an older saved recipe) to the nearest
-    setting via `rollerFor()`.
-  - KitchenAid has never published the gap for each setting, so `ROLLER`'s mm
-    column is inferred from the manual's own use-guidance (3 = thick kluski,
-    4 = egg noodles, 7–8 = capellini) and varies unit to unit. It is the single
-    place to recalibrate after measuring a sheet with calipers.
-  - The cutter list is two `<optgroup>`s: the owned blades (spaghetti 2 mm =
-    #15, fettuccine 6.5 mm = #4.6 — note the fractional cut numbers, hence
-    `fmtCut()`) and the standard Japanese sizes, which have to be hand-cut or
-    bought. `renderKit()` is the reality check: which roller setting, whether
-    that blade is owned, and which styles the width can reach.
-  - `loadReference()` deliberately keeps picking from `CUT_NUMBERS`, not the
-    owned blades — a reference formula is what the style wants, and the kit
-    note separately says whether it can be cut. Every style's thickness band is
-    reachable on some roller setting, which is why the round-trip survives the
-    snapping.
-- **Effective hydration is the headline, not added water.** Egg and liquid
-  kansui are mostly water, and that water is summed in exactly one place, in
-  `compute()` — the `EGG_FORMS` / `KANSUI_FORMS` tables carry a `water`
-  fraction but nothing else adds hydration, so nothing is double-counted. Same
-  discipline as lactose in the Ice Cream Calculator.
-- **All alkali reduces to one number.** Powdered kansui (with an adjustable
-  K₂CO₃:Na₂CO₃ ratio), liquid kansui (a solution — dose ≠ salts), baked baking
-  soda and bicarbonate are all converted to a carbonate-equivalent percentage
-  of a 90:10 kansui powder (`ALKALI_REF`), which is the only alkali figure the
-  styles are ever scored against. The `CARB_BICARB` 0.35 factor is empirical.
-- **Styles** live in `STYLES` — 22 regional profiles, each a set of `[lo, hi]`
-  bands, grouped in the picker by the four broad `BROTHS` bands. `ATTRS` drives
-  both the delta table and the ranking, holding each attribute's weight and the
-  tolerance over which a miss decays to zero.
-- **Scoring** (`scoreAttr`) gives 1.0 at the dead centre of a band and 0.98 at
-  its edges before decaying linearly. That tiny in-band slope exists purely to
-  break ties between overlapping styles — it's what makes "Load reference
-  formula" round-trip to rank its own style first for all 22.
-- **Flour blend rows carry their own protein and ash**, and vital wheat gluten
-  and starches live in that table rather than as separate extras, because they
-  shift the weighted blend protein that styles score against.
-- Boil time, predicted colour and the three texture bars are openly labelled
-  heuristics; `COOK_K` is calibrated against two known anchors (see the comment).
-- Custom flours and saved recipes persist to localStorage under `rnc:flours`
-  and `rnc:recipes`; recipes are full state snapshots
-  (`snapshot()`/`applyRecipe()`).
+Port of the original model: flour blend → alkali normalised to a 90:10
+kansui powder (`ALKALI_REF`) → egg → water summed once → geometry from cut
+number (width = 30/n) and the KitchenAid `ROLLER` gap → boil time, colour,
+texture. Egg is an ingredient from the DB (`egg.wholeEq` is by solids: yolk
+2.0, dried 3.9); picking a form seeds a default % so it is never a silent
+no-op, and its fat/protein feed texture and a dough-protein note. Kansui is
+ignored entirely when the form is "none". Styles (`STYLES`, 22) are scored by
+`scoreStyle()` over `ATTRS`; **width is scored in mm** (`styleBand()`
+converts cut bands). "Load reference formula" (`referenceFormula()`) keeps the
+current egg form, back-solves the egg % from whole-egg equivalence and must
+rank its own style first for all 22 — that invariant is a test.

@@ -3,21 +3,48 @@
 Personal homepage and small utilities, served from
 [sebcarss.github.io](https://sebcarss.github.io).
 
-Plain static HTML/CSS — no build step. Push to `master` and GitHub Pages serves
-the tree as-is (`.nojekyll`).
+The food calculators are a Vite + React + TypeScript app that installs as a
+PWA and works offline on a phone. The music tools are plain static pages
+under `public/music/` and are served as-is.
+
+## Running locally
+
+```
+npm install
+npm run dev          # http://localhost:5173 with hot reload
+npm test             # engine, migration and rendered smoke tests (vitest)
+npm run build        # type-check + production build into dist/
+npm run preview      # serve dist/ (service worker active)
+npm run dev:phone    # dev server over HTTPS on the LAN, for testing on a phone
+```
+
+## Deploying
+
+Push to `master`. The GitHub Actions workflow in `.github/workflows/deploy.yml`
+installs, tests, builds and deploys `dist/` with `actions/deploy-pages`. In the
+repository settings, **Pages → Build and deployment → Source** must be set to
+**GitHub Actions** (a one-off change from the old "deploy from branch").
 
 ## Structure
 
 ```
-index.html                    Homepage
-styles.css                    Shared styles
-404.html                      Not-found page
-music/index.html              Music category page
-music/tab-caster/index.html   Tab Caster utility (self-contained)
-music/scale-charts/index.html Scale Charts utility (self-contained)
-food/index.html               Food category page
-food/ice-cream-calculator/index.html   Ice Cream Calculator utility (self-contained)
-food/bakers-percentage/index.html      Baker's Percentage Calculator utility (self-contained)
+index.html                Vite entry
+src/
+  main.tsx, routes.tsx    Router: /, /food, /food/<tool>
+  components/             Shared UI (NumberInput, Meter, RecipeBar, IngredientPicker…)
+  lib/ingredients/        The shared ingredient database and custom-ingredient store
+  lib/recipes/            Saved recipes, drafts, legacy migration
+  lib/export/             Plain-text recipe formatting, share sheet / clipboard
+  tools/ice-cream/        engine.ts (pure maths) + IceCream.tsx (page) + tests
+  tools/bread/            Baker's percentage calculator
+  tools/ramen/            Ramen noodle calculator
+  pages/                  Home, Food (+ backup), NotFound
+  styles/                 global.css (tokens, light + dark) and tools.css
+public/
+  music/**                Tab Caster and Scale Charts — untouched static pages
+  styles.css              Stylesheet the static music pages link to
+  icons/                  PWA icons
+scripts/postbuild.mjs     Writes an index.html per route and 404.html into dist/
 ```
 
 ## Music
@@ -31,27 +58,15 @@ food/bakers-percentage/index.html      Baker's Percentage Calculator utility (se
 ## Food
 
 - **[Ice Cream Calculator](https://sebcarss.github.io/food/ice-cream-calculator)** —
-  balance fat, sugar and MSNF (plus POD/PAC) against ice cream and gelato
-  targets to develop new recipes.
+  balance fat, sugar and MSNF (plus POD/PAC, freezing point and lactose)
+  against ice cream, gelato and sorbet targets.
 - **[Baker's Percentage Calculator](https://sebcarss.github.io/food/bakers-percentage)** —
-  bread doughs in baker's percentages, with hydration/salt/yeast guidance and
-  poolish, biga and levain preferments.
+  bread doughs in baker's percentages, with effective hydration, typed yeast
+  and poolish, biga, levain, pâte fermentée or sponge preferments.
+- **[Ramen Noodle Calculator](https://sebcarss.github.io/food/ramen-noodles)** —
+  flour blend, hydration, kansui, egg, cut and crimp, matched against 22
+  regional styles.
 - **[Dreaming of Noodles](https://dreamingofnoodles.com)** — my Japanese food blog.
 
-## Adding a new utility
-
-1. Drop the self-contained app at `<category>/<name>/index.html`.
-2. Add a `.card` link on `index.html` (and the category page).
-3. If it's a new category, add a nav link and, optionally, a `<category>/index.html`.
-
-## Running and testing locally
-
-There's no build step, so any static file server works. From the repo root:
-
-```
-python3 -m http.server 8000
-```
-
-Then open [http://localhost:8000](http://localhost:8000) in a browser. Pages
-link with absolute paths (e.g. `/food/`), so serve from the repo root rather
-than opening the HTML files directly via `file://`.
+Recipes save on the device (with a JSON backup/import on the Food page) and
+share to Apple Notes as formatted text via the iOS share sheet.
