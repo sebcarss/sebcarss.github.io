@@ -5,3 +5,7 @@ if (typeof window !== "undefined" && !window.matchMedia) {
     value: (q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }),
   });
 }
+if (typeof window !== "undefined") {
+  // jsdom logs "not implemented" for scrolling; pages scroll to top on navigation.
+  window.scrollTo = () => {};
+}

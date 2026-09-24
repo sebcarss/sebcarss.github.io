@@ -14,6 +14,9 @@ vi.mock("@/tools/cookbooks/data", () => ({
   ENTRIES: [
     { title: "Pasta Bake", book: "Test Kitchen", page: 34 },
     { title: "Chicken Pasta", book: "Test Kitchen", page: 36 },
+    { title: "Moussaka", book: "Test Kitchen", page: 12 },
+    { title: "Easy Pasta Bake", book: "Weeknight Suppers", page: 80 },
+    { title: "Tomato Soup", book: "Weeknight Suppers", page: 5 },
   ],
 }));
 
@@ -89,15 +92,54 @@ describe("pages render", () => {
     expect(screen.getByText(/100% match|9\d% match/)).toBeTruthy();
   });
 
-  it("cookbooks: searching shows the book and page, exact match first", () => {
+  it("cookbooks: recipe search across books, exact match first", () => {
     at("/food/cookbooks", <Cookbooks />);
-    expect(screen.queryByText("Results")).toBeNull();
     fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "pasta bake" } });
     const items = screen.getAllByRole("listitem");
     expect(items[0]!.textContent).toMatch(/Pasta Bake.*Exact.*Test Kitchen · p\. 34/);
+    expect(screen.getByText("Easy Pasta Bake")).toBeTruthy();
     expect(screen.getByText("Also mentions…")).toBeTruthy();
     expect(screen.getByText("Chicken Pasta")).toBeTruthy();
+    expect(screen.queryByText("Books")).toBeNull(); // no book is called "pasta bake"
     fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "sushi" } });
     expect(screen.getByText(/No recipes match/)).toBeTruthy();
+  });
+
+  it("cookbooks: browse the book list, open a book, search in it and go back", () => {
+    at("/food/cookbooks", <Cookbooks />);
+    expect(screen.getByText("Your books (2)")).toBeTruthy();
+    expect(screen.getByText("Test Kitchen").closest("a")!.textContent).toMatch(/Test Kitchen3 recipes/);
+    fireEvent.click(screen.getByText("Test Kitchen"));
+    expect(screen.getByRole("heading", { name: "Test Kitchen" })).toBeTruthy();
+    // The whole book, in page order.
+    expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Moussakap. 12", "Pasta Bakep. 34", "Chicken Pastap. 36"]);
+    // Searching inside the book only finds its recipes.
+    fireEvent.change(screen.getByLabelText("Search this book"), { target: { value: "pasta bake" } });
+    expect(screen.getByText("Pasta Bake")).toBeTruthy();
+    expect(screen.queryByText("Easy Pasta Bake")).toBeNull();
+    fireEvent.click(screen.getByText("‹ All books"));
+    expect(screen.getByText("Your books (2)")).toBeTruthy();
+  });
+
+  it("cookbooks: find a book by name, or open it from a recipe result", () => {
+    at("/food/cookbooks", <Cookbooks />);
+    fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "weeknite suppers" } });
+    expect(screen.getByRole("heading", { name: "Books" })).toBeTruthy();
+    fireEvent.click(screen.getByText("Weeknight Suppers"));
+    expect(screen.getByRole("heading", { name: "Weeknight Suppers" })).toBeTruthy();
+    expect((screen.getByLabelText("Search this book") as HTMLInputElement).value).toBe("");
+    fireEvent.click(screen.getByText("‹ All books"));
+    fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "moussaka" } });
+    fireEvent.click(screen.getByText("Test Kitchen"));
+    expect(screen.getByRole("heading", { name: "Test Kitchen" })).toBeTruthy();
+  });
+
+  it("cookbooks: an unknown book says so", () => {
+    render(
+      <MemoryRouter initialEntries={["/food/cookbooks?book=Nope"]}>
+        <Cookbooks />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Book not found")).toBeTruthy();
   });
 });

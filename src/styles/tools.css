@@ -159,6 +159,17 @@ textarea { width: 100%; min-height: 4.5rem; resize: vertical; }
 /* Cookbook finder */
 .params .wide input[type="search"] { width: 100%; font-size: 1.05rem; padding: 0.5rem 0.65rem; }
 .results .meta { text-align: right; }
+.links li { padding: 0; }
+.list a.row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex: 1; min-height: 2.75rem; padding: 0.35rem 0.4rem; margin: 0 -0.4rem; border-radius: 8px; color: inherit; text-decoration: none; }
+.list a.row::after { content: "›"; color: var(--muted); font-size: 1.2rem; line-height: 1; }
+.list a.row .meta { margin-left: auto; }
+.list a.row:hover, .list a.row:focus-visible { background: var(--surface-2); }
+.book-link { color: inherit; text-decoration: none; }
+.book-link:hover { color: var(--accent); text-decoration: underline; }
+.back { display: inline-block; margin-bottom: 0.5rem; color: var(--muted); font-size: 0.9rem; text-decoration: none; }
+.back:hover { color: var(--accent); }
+.book-count { margin: -0.5rem 0 0.85rem; }
+.more summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; padding: 0.5rem 0; }
 .badge { display: inline-block; margin-left: 0.5rem; padding: 0 0.45rem; border-radius: 999px; background: var(--ok-soft); color: var(--ok); font-size: 0.75rem; font-weight: 600; vertical-align: 0.1em; }
 
 /* Custom ingredient form */

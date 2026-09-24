@@ -106,7 +106,9 @@ scripts/lib/              Its pure, tested helpers
   regional styles.
 - **[Cookbook Finder](https://sebcarss.github.io/food/cookbooks)** — search
   the cookbooks on my shelf ("moussaka", "pasta bake") and get the book and
-  page. Exact titles come first; close matches and typos still show up.
+  page. Exact titles come first; close matches and typos still show up. The
+  same box finds books by name, and opening a book lists all its recipes in
+  page order, with a search inside that book.
 - **[Dreaming of Noodles](https://dreamingofnoodles.com)** — my Japanese food blog.
 
 Recipes save on the device (with a JSON backup/import on the Food page) and

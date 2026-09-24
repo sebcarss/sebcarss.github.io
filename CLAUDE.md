@@ -127,8 +127,20 @@ then scored: exact title 1000 → title contains the query phrase 700–800 →
 every non-stopword query word matches 550–650 (all "strong") → some match,
 `400 × avg word score` ("partial", shown under "Also mentions…"). A word
 matches exactly (1), as a prefix of a title word of 3+ chars (0.9), or within
-Levenshtein 1 (5+ chars) / 2 (8+ chars) (0.8). The query and book filter live
-in the URL (`?q=&book=`).
+Levenshtein 1 (5+ chars) / 2 (8+ chars) (0.8). `searchBooks` scores book
+names with the same `scoreText`; `bookSummaries` gives counts A–Z and
+`bookRecipes` one book in page order.
+
+The page has three states driven by the URL:
+- no `q` and no `book`: the list of all books
+- `q` only: matching books (top 5, the rest behind "Show all") above the
+  recipe results, where each book name links to its book
+- `book`: that book's recipes in page order, and the box searches only
+  that book ("Book not found" for an unknown name)
+
+Opening a book is a `<Link>` (pushes history, drops `q`) so Back works;
+typing uses `setParams(..., { replace: true })`. There is no book `<select>`
+any more. The render tests mock `data.ts` with two books.
 
 `scripts/add-recipes.mjs` is the only way data gets in besides hand edits.
 It must stay plain Node ESM (the local Node is 20, so no TS). Its logic lives

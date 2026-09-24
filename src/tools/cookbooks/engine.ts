@@ -72,8 +72,8 @@ function prepare(query: string): Query | null {
   return { phrase: all.join(" "), terms: terms.length ? terms : all };
 }
 
-/** Score one title against a prepared query; null means no match. */
-function scoreTitle(q: Query, title: string): { score: number; kind: MatchKind } | null {
+/** Score a recipe title or book name against a prepared query; null means no match. */
+function scoreText(q: Query, title: string): { score: number; kind: MatchKind } | null {
   const tw = words(title);
   const phrase = tw.join(" ");
   const extra = Math.max(0, tw.length - q.phrase.split(" ").length);
@@ -98,13 +98,41 @@ export function search(query: string, entries: readonly Entry[], opts: { book?: 
   const out: Match[] = [];
   for (const e of entries) {
     if (opts.book && e.book !== opts.book) continue;
-    const s = scoreTitle(q, e.title);
+    const s = scoreText(q, e.title);
     if (s) out.push({ ...e, ...s });
   }
   return out.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title) || a.book.localeCompare(b.book) || a.page - b.page);
 }
 
+export interface BookSummary {
+  book: string;
+  recipes: number;
+}
+export type BookMatch = BookSummary & { score: number; kind: MatchKind };
+
+/** Every book with its recipe count, A–Z. */
+export function bookSummaries(entries: readonly Entry[]): BookSummary[] {
+  const counts = new Map<string, number>();
+  for (const e of entries) counts.set(e.book, (counts.get(e.book) ?? 0) + 1);
+  return [...counts].map(([book, recipes]) => ({ book, recipes })).sort((a, b) => a.book.localeCompare(b.book));
+}
+
+/** Books whose name matches the query, best first; same rules as recipe titles. */
+export function searchBooks(query: string, books: readonly BookSummary[]): BookMatch[] {
+  const q = prepare(query);
+  if (!q) return [];
+  return books
+    .flatMap((b) => {
+      const s = scoreText(q, b.book);
+      return s ? [{ ...b, ...s }] : [];
+    })
+    .sort((a, b) => b.score - a.score || a.book.localeCompare(b.book));
+}
+
+/** One book's recipes in page order, like its index. */
+export const bookRecipes = (entries: readonly Entry[], book: string): Entry[] =>
+  entries.filter((e) => e.book === book).sort((a, b) => a.page - b.page || a.title.localeCompare(b.title));
+
 export function stats(entries: readonly Entry[]) {
-  const books = [...new Set(entries.map((e) => e.book))].sort((a, b) => a.localeCompare(b));
-  return { books, recipes: entries.length };
+  return { books: bookSummaries(entries).length, recipes: entries.length };
 }
