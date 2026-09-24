@@ -6,12 +6,15 @@ interface Props {
   title: string;
   children: ReactNode;
   external?: boolean;
+  emoji?: string;
 }
 
-export function Card({ to, title, children, external }: Props) {
+export function Card({ to, title, children, external, emoji }: Props) {
   const body = (
     <>
-      <h3>{title}</h3>
+      <h3>
+        {emoji && <span aria-hidden="true">{emoji}</span>} {title}
+      </h3>
       <p>{children}</p>
     </>
   );

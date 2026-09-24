@@ -14,10 +14,10 @@ export function Home() {
           <span aria-hidden="true">🎵</span> Music
         </h2>
         <div className="cards">
-          <Card to="/music/tab-caster/" title="Tab Caster">
+          <Card to="/music/tab-caster/" title="Tab Caster" emoji="🎸">
             Turn an Ultimate Guitar PDF into a single-screen tab you can cast to a TV.
           </Card>
-          <Card to="/music/scale-charts/" title="Scale Charts">
+          <Card to="/music/scale-charts/" title="Scale Charts" emoji="🎹">
             Notes and chords for every scale degree in every key, with chord progressions highlighted — sized to cast to a TV.
           </Card>
         </div>
