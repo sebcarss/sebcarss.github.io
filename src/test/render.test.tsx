@@ -7,6 +7,15 @@ import { Food } from "@/pages/Food";
 import { IceCream } from "@/tools/ice-cream/IceCream";
 import { Bread } from "@/tools/bread/Bread";
 import { Ramen } from "@/tools/ramen/Ramen";
+import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
+
+// Fixed books so the smoke test doesn't depend on the real data files.
+vi.mock("@/tools/cookbooks/data", () => ({
+  ENTRIES: [
+    { title: "Pasta Bake", book: "Test Kitchen", page: 34 },
+    { title: "Chicken Pasta", book: "Test Kitchen", page: 36 },
+  ],
+}));
 
 vi.mock("virtual:pwa-register/react", () => ({
   useRegisterSW: () => ({ needRefresh: [false, () => {}], offlineReady: [false, () => {}], updateServiceWorker: async () => {} }),
@@ -33,6 +42,7 @@ describe("pages render", () => {
     cleanup();
     at("/food", <Food />);
     expect(screen.getByText(/Ramen Noodle Calculator/)).toBeTruthy();
+    expect(screen.getByText(/Cookbook Finder/)).toBeTruthy();
     expect(screen.getByText(/Export all/)).toBeTruthy();
   });
 
@@ -77,5 +87,17 @@ describe("pages render", () => {
     fireEvent.click(screen.getByText("Match a style"));
     fireEvent.click(screen.getByText("Load reference formula"));
     expect(screen.getByText(/100% match|9\d% match/)).toBeTruthy();
+  });
+
+  it("cookbooks: searching shows the book and page, exact match first", () => {
+    at("/food/cookbooks", <Cookbooks />);
+    expect(screen.queryByText("Results")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "pasta bake" } });
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]!.textContent).toMatch(/Pasta Bake.*Exact.*Test Kitchen · p\. 34/);
+    expect(screen.getByText("Also mentions…")).toBeTruthy();
+    expect(screen.getByText("Chicken Pasta")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "sushi" } });
+    expect(screen.getByText(/No recipes match/)).toBeTruthy();
   });
 });

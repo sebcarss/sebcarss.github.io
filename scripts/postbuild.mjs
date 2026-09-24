@@ -9,7 +9,7 @@ const dist = new URL("../dist/", import.meta.url).pathname;
 const index = join(dist, "index.html");
 
 // Keep in sync with src/routes.tsx.
-const routes = ["food", "food/ice-cream-calculator", "food/bakers-percentage", "food/ramen-noodles"];
+const routes = ["food", "food/ice-cream-calculator", "food/bakers-percentage", "food/ramen-noodles", "food/cookbooks"];
 
 for (const route of routes) {
   const dir = join(dist, route);

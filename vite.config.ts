@@ -13,7 +13,7 @@ export default defineConfig({
         name: "Seb's Kitchen",
         short_name: "Kitchen",
         description:
-          "Ice cream, bread and ramen noodle calculators that work offline.",
+          "Ice cream, bread and ramen noodle calculators and a cookbook finder that work offline.",
         start_url: "/food/",
         scope: "/",
         display: "standalone",
@@ -45,7 +45,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
     setupFiles: ["src/test/setup.ts"],
   },
 });

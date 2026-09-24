@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "add-recipes": "node scripts/add-recipes.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",

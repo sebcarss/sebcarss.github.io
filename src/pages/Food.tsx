@@ -13,6 +13,9 @@ export const FOOD_CARDS = (
     <Card to="/food/ramen-noodles/" title="Ramen Noodle Calculator">
       Balance hydration, kansui, egg and cut number, then see which regional ramen style the noodle actually fits.
     </Card>
+    <Card to="/food/cookbooks/" title="Cookbook Finder">
+      Search the cookbooks on my shelf for a recipe and get the book and page number.
+    </Card>
     <Card to="https://dreamingofnoodles.com" title="Dreaming of Noodles" external>
       My Japanese food blog.
     </Card>
@@ -24,7 +27,7 @@ export function Food() {
     <main>
       <section className="intro">
         <h1>Food</h1>
-        <p>Calculators for the kitchen. They work offline once you've opened them, and you can add this site to your phone's home screen.</p>
+        <p>Calculators and a cookbook finder for the kitchen. They work offline once you've opened them, and you can add this site to your phone's home screen.</p>
       </section>
       <section className="category">
         <div className="cards">{FOOD_CARDS}</div>

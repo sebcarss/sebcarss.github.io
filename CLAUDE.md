@@ -9,7 +9,7 @@ Seb Carss's personal homepage at sebcarss.github.io. Two halves:
 - **Food calculators** — a Vite + React 19 + TypeScript single-page app in
   `src/`, installable as a PWA (`vite-plugin-pwa`) so it works offline on a
   phone. Routes: `/`, `/food/`, `/food/ice-cream-calculator/`,
-  `/food/bakers-percentage/`, `/food/ramen-noodles/`.
+  `/food/bakers-percentage/`, `/food/ramen-noodles/`, `/food/cookbooks/`.
 - **Music tools** — `public/music/**` (Tab Caster, Scale Charts). Plain,
   self-contained static HTML that the build copies through unchanged. They
   link `/styles.css`, which lives at `public/styles.css`. Don't refactor them
@@ -17,7 +17,8 @@ Seb Carss's personal homepage at sebcarss.github.io. Two halves:
 
 Commands: `npm run dev`, `npm test` (vitest), `npm run build` (runs `tsc
 --noEmit` first, then `scripts/postbuild.mjs`), `npm run preview`,
-`npm run dev:phone` (HTTPS on the LAN). Deployed by
+`npm run dev:phone` (HTTPS on the LAN), `npm run add-recipes` (interactive
+cookbook entry that commits and pushes; see below). Deployed by
 `.github/workflows/deploy.yml` on push to `master` (Pages source must be
 "GitHub Actions"). `dist/` is generated; never commit it.
 
@@ -57,6 +58,8 @@ Commands: `npm run dev`, `npm test` (vitest), `npm run build` (runs `tsc
   `prefers-color-scheme`), shared tool classes in `tools.css`, and a small set
   of components. `NumberInput` keeps its own text while focused; use
   `mode="commit"` for derived gram fields that write back to a %.
+- Tests live in `src/**/*.test.ts(x)` and `scripts/**/*.test.ts`
+  (`allowJs` lets TS tests import the `.mjs` script helpers).
 - `scripts/postbuild.mjs` has the route list — keep it in sync with
   `src/routes.tsx` when adding a tool. Music is excluded from the service
   worker precache (`globIgnores`) and from the navigate fallback.
@@ -106,3 +109,33 @@ ignored entirely when the form is "none". Styles (`STYLES`, 22) are scored by
 converts cut bands). "Load reference formula" (`referenceFormula()`) keeps the
 current egg form, back-solves the egg % from whole-egg equivalence and must
 rank its own style first for all 22 — that invariant is a test.
+
+## Cookbook Finder (`src/tools/cookbooks/`)
+
+A search page rather than a calculator: no `compute`, `state.ts`, `useDraft`
+or `RecipeBar`. Data is one JSON file per book in `books/`
+(`{ book, recipes: [{ title, page }] }`), loaded with `import.meta.glob` in
+`data.ts`. They're bundled into the JS, so they work offline. Files are
+validated leniently with zod (`parseBooks` skips a bad book with a warning),
+and `data.test.ts` fails CI on any invalid file, duplicate title+page or
+duplicate book name. `example-cookbook.json` is only a placeholder; the render test
+mocks `data.ts`, so deleting it is safe.
+
+`engine.ts` `search(query, entries, { book })` is pure. Titles and query are
+normalised (accents, case, `&`→and, punctuation) and lightly singularised,
+then scored: exact title 1000 → title contains the query phrase 700–800 →
+every non-stopword query word matches 550–650 (all "strong") → some match,
+`400 × avg word score` ("partial", shown under "Also mentions…"). A word
+matches exactly (1), as a prefix of a title word of 3+ chars (0.9), or within
+Levenshtein 1 (5+ chars) / 2 (8+ chars) (0.8). The query and book filter live
+in the URL (`?q=&book=`).
+
+`scripts/add-recipes.mjs` is the only way data gets in besides hand edits.
+It must stay plain Node ESM (the local Node is 20, so no TS). Its logic lives
+in `scripts/lib/cookbooks.mjs` (parse `Title, page` lines, slugify, sort,
+duplicate check, one-recipe-per-line `serializeBook`) with tests in
+`cookbooks.test.ts`, which round-trip through `BookSchema`, so keep the two
+formats in sync. It rewrites the book file after every entry, requires
+`master`, and commits only that file (`git commit -- <file>`, then `pull
+--rebase --autostash`, then push). It reads input via the readline async
+iterator so piped/pasted lines aren't dropped.
