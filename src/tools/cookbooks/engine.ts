@@ -1,4 +1,4 @@
-import type { Entry, IndexEntry, IndexRow } from "./data";
+import type { Book, Entry, IndexEntry, IndexRow } from "./data";
 
 export type MatchKind = "exact" | "strong" | "partial";
 export interface Match extends Entry {
@@ -162,14 +162,17 @@ export function bookIndex(index: readonly IndexEntry[]): IndexGroup[] {
 export interface BookSummary {
   book: string;
   recipes: number;
+  /** Lines in the book's index; 0 when it has none. */
+  index: number;
 }
 export type BookMatch = BookSummary & { score: number; kind: MatchKind };
 
-/** Every book with its recipe count, A–Z. */
-export function bookSummaries(entries: readonly Entry[]): BookSummary[] {
-  const counts = new Map<string, number>();
-  for (const e of entries) counts.set(e.book, (counts.get(e.book) ?? 0) + 1);
-  return [...counts].map(([book, recipes]) => ({ book, recipes })).sort((a, b) => a.book.localeCompare(b.book));
+/**
+ * Every book with its recipe and index-line counts, A–Z. Built from the book
+ * files, not the recipes, so a book imported from its index alone is listed.
+ */
+export function bookSummaries(books: readonly Book[]): BookSummary[] {
+  return books.map((b) => ({ book: b.book, recipes: b.recipes.length, index: b.index?.length ?? 0 })).sort((a, b) => a.book.localeCompare(b.book));
 }
 
 /** Books whose name matches the query, best first; same rules as recipe titles. */
@@ -189,5 +192,5 @@ export const bookRecipes = (entries: readonly Entry[], book: string): Entry[] =>
   entries.filter((e) => e.book === book).sort((a, b) => a.page - b.page || a.title.localeCompare(b.title));
 
 export function stats(entries: readonly Entry[]) {
-  return { books: bookSummaries(entries).length, recipes: entries.length };
+  return { books: new Set(entries.map((e) => e.book)).size, recipes: entries.length };
 }

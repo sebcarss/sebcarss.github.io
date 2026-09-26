@@ -12,6 +12,9 @@ const BOOK_MATCHES_SHOWN = 5;
 // Back returns to the list or results and a book can be bookmarked.
 const bookHref = (book: string) => ({ search: "?book=" + encodeURIComponent(book) });
 const plural = (n: number, one: string, many = one + "s") => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+/** "105 recipes", "105 recipes · index" or, for a book imported from its index alone, "881 index lines". */
+const bookCount = (b: BookSummary) =>
+  b.recipes || !b.index ? plural(b.recipes, "recipe") + (b.index ? " · index" : "") : plural(b.index, "index line");
 
 function BookList({ books }: { books: BookSummary[] }) {
   return (
@@ -20,7 +23,7 @@ function BookList({ books }: { books: BookSummary[] }) {
         <li key={b.book}>
           <Link className="row" to={bookHref(b.book)}>
             <span>{b.book}</span>
-            <span className="meta">{plural(b.recipes, "recipe")}</span>
+            <span className="meta">{bookCount(b)}</span>
           </Link>
         </li>
       ))}
@@ -101,16 +104,18 @@ export function Cookbooks() {
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const book = params.get("book") ?? "";
-  const view = params.get("view") === "index" ? "index" : "recipes";
+  const wantIndex = params.get("view") === "index";
   const typing = q.trim() !== "";
-  const books = useMemo(() => bookSummaries(ENTRIES), []);
+  const books = useMemo(() => bookSummaries(BOOKS), []);
   const open = book ? books.find((b) => b.book === book) : undefined;
+  // A book with only an index opens on it; with both, the toggle chooses.
+  const view = open && open.index > 0 && (wantIndex || open.recipes === 0) ? "index" : "recipes";
 
   const bookMatches = useMemo(() => (typing && !book ? searchBooks(q, books) : []), [q, book, typing, books]);
   const recipeMatches = useMemo(() => (typing ? search(q, ENTRIES, { book: book || undefined, index: INDEX_ROWS }) : []), [q, book, typing]);
   const contents = useMemo(() => (open ? bookRecipes(ENTRIES, open.book) : []), [open]);
   const indexGroups = useMemo(() => bookIndex((open && BOOKS.find((b) => b.book === open.book)?.index) || []), [open]);
-  const indexed = BOOKS.filter((b) => b.index?.length).length;
+  const indexed = books.filter((b) => b.index > 0).length;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -160,13 +165,13 @@ export function Cookbooks() {
           {open ? (
             <>
               <h2>{open.book}</h2>
-              <p className="note book-count">{plural(open.recipes, "recipe")}</p>
+              <p className="note book-count">{bookCount(open)}</p>
               {searchBox}
               {typing ? (
                 <RecipeMatches matches={recipeMatches} showBook={false} />
               ) : (
                 <>
-                  {indexGroups.length > 0 && (
+                  {open.recipes > 0 && indexGroups.length > 0 && (
                     <Toggle
                       label="Show"
                       value={view}
@@ -177,7 +182,7 @@ export function Cookbooks() {
                       ]}
                     />
                   )}
-                  {view === "index" && indexGroups.length > 0 ? <IndexList groups={indexGroups} /> : <Results items={contents} showBook={false} />}
+                  {view === "index" ? <IndexList groups={indexGroups} /> : <Results items={contents} showBook={false} />}
                 </>
               )}
             </>

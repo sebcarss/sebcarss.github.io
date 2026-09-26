@@ -92,20 +92,22 @@ describe("search", () => {
 });
 
 describe("books", () => {
+  const r = (title: string) => ({ title, page: 1 });
   const BOOKS = bookSummaries([
-    E("Soup", "Salt, Fat, Acid, Heat"),
-    E("Stew", "Ottolenghi Simple"),
-    E("Salad", "Ottolenghi Simple"),
-    E("Curry", "Ottolenghi Flavour"),
-    E("Pie", "The Pie Book"),
+    { book: "Salt, Fat, Acid, Heat", recipes: [r("Soup")] },
+    { book: "Ottolenghi Simple", recipes: [r("Stew"), r("Salad")] },
+    { book: "Ottolenghi Flavour", recipes: [r("Curry")] },
+    { book: "The Pie Book", recipes: [r("Pie")] },
+    { book: "River Cottage Every Day", recipes: [], index: [{ term: "Salo", pages: [3] }, { term: "Pork", sub: "salo", pages: [3] }] },
   ]);
 
-  it("counts recipes per book, A–Z", () => {
+  it("counts recipes and index lines per book, A–Z, including a book with only an index", () => {
     expect(BOOKS).toEqual([
-      { book: "Ottolenghi Flavour", recipes: 1 },
-      { book: "Ottolenghi Simple", recipes: 2 },
-      { book: "Salt, Fat, Acid, Heat", recipes: 1 },
-      { book: "The Pie Book", recipes: 1 },
+      { book: "Ottolenghi Flavour", recipes: 1, index: 0 },
+      { book: "Ottolenghi Simple", recipes: 2, index: 0 },
+      { book: "River Cottage Every Day", recipes: 0, index: 2 },
+      { book: "Salt, Fat, Acid, Heat", recipes: 1, index: 0 },
+      { book: "The Pie Book", recipes: 1, index: 0 },
     ]);
     expect(stats(ENTRIES)).toEqual({ books: 3, recipes: ENTRIES.length });
   });
@@ -113,6 +115,7 @@ describe("books", () => {
   it("finds books by name with the same tolerance as recipes", () => {
     const names = (q: string) => searchBooks(q, BOOKS).map((b) => b.book);
     expect(searchBooks("ottolenghi simple", BOOKS)[0]).toMatchObject({ book: "Ottolenghi Simple", kind: "exact", recipes: 2 });
+    expect(names("river cottage")).toEqual(["River Cottage Every Day"]);
     expect(names("ottolengi")).toEqual(["Ottolenghi Flavour", "Ottolenghi Simple"]);
     expect(names("SIMPLE")).toEqual(["Ottolenghi Simple"]);
     expect(names("salt fat")[0]).toBe("Salt, Fat, Acid, Heat");

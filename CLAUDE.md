@@ -135,8 +135,10 @@ every non-stopword query word matches 550–650 (all "strong") → some match,
 `400 × avg word score` ("partial", shown under "Also mentions…"). A word
 matches exactly (1), as a prefix of a title word of 3+ chars (0.9), or within
 Levenshtein 1 (5+ chars) / 2 (8+ chars) (0.8). `searchBooks` scores book
-names with the same `scoreText`; `bookSummaries` gives counts A–Z and
-`bookRecipes` one book in page order.
+names with the same `scoreText`; `bookSummaries(BOOKS)` gives recipe and
+index-line counts A–Z. It's built from the book files, not the recipes, so a
+book imported from its index alone is listed and opens (on its index, with no
+toggle). `bookRecipes` gives one book in page order.
 
 Index search: `toIndexRows` (data.ts) expands each index line × page into
 an `IndexRow` joined to `recipeAt(recipes, page)`, which is the last recipe
