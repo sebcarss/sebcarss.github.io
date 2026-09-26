@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveSee, titleKey } from "../../../scripts/lib/cookbooks.mjs";
 
 // One JSON file per book in ./books, written by `npm run add-recipes`,
 // `npm run import-book` (scripts/) or by hand.
@@ -68,21 +69,23 @@ export function recipeAt(recipes: readonly Recipe[], page: number): Recipe | nul
   return best && page - best.page <= RECIPE_SPAN ? best : null;
 }
 
-const termKey = (s: string) => s.trim().toLowerCase();
-
-/** Every page reference in every book's index; "see" entries take their target's pages. */
+/**
+ * Every page reference in every book's index; "see" entries take their
+ * targets' pages (resolveSee, shared with the import script, reads lists).
+ */
 export function toIndexRows(books: Book[]): IndexRow[] {
   return books.flatMap((b) => {
     const index = b.index ?? [];
+    const terms = index.map((e) => e.term);
     const ownPages = (term: string) => {
-      const same = index.filter((e) => termKey(e.term) === termKey(term));
+      const same = index.filter((e) => titleKey(e.term) === titleKey(term));
       const own = same.filter((e) => !e.sub).flatMap((e) => e.pages ?? []);
       return own.length ? own : same.flatMap((e) => e.pages ?? []);
     };
     return index.flatMap((e) => {
       const heading = e.sub ? `${e.term} › ${e.sub}` : e.term;
       const texts = e.sub ? [`${e.term} ${e.sub}`, e.sub] : [e.term];
-      const pages = e.pages?.length ? e.pages : ownPages(e.see!);
+      const pages = e.pages?.length ? e.pages : resolveSee(e.see!, terms).flatMap(ownPages);
       const label = e.pages?.length || !e.see ? heading : `${heading} → ${e.see}`;
       return [...new Set(pages)].map((page) => ({ book: b.book, page, label, texts, title: recipeAt(b.recipes, page)?.title ?? null }));
     });

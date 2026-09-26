@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BookSchema } from "../../src/tools/cookbooks/data";
 import {
-  actionsUrl, addRecipe, checkBook, cleanBook, isDuplicate, mergeBook, parseEntryLine, parseImport, parsePage, removeRecipe, serializeBook, slugForNewBook,
-  slugify, sortRecipes, validateBook,
+  actionsUrl, addRecipe, checkBook, cleanBook, isDuplicate, mergeBook, parseEntryLine, parseImport, parsePage, removeRecipe, resolveSee, serializeBook,
+  slugForNewBook, slugify, sortRecipes, validateBook,
 } from "./cookbooks.mjs";
 
 describe("parseEntryLine", () => {
@@ -170,11 +170,21 @@ describe("book indexes and imports", () => {
     expect(mergeBook({ book: "New", recipes: [] }, { book: "New", recipes: [] }).book).not.toHaveProperty("index");
   });
 
+  it("resolves see lists and headings named by their start", () => {
+    const terms = ["butter beans, pot-roast pheasant with", "white beans", "blue cheese", "goat's cheese", "dried fruit", "apples", "stews and casseroles", "smoked haddock, scrambled eggs with"];
+    expect(resolveSee("butter beans, white beans etc", terms)).toEqual(["butter beans, pot-roast pheasant with", "white beans"]);
+    expect(resolveSee("blue cheese; goat's cheese", terms)).toEqual(["blue cheese", "goat's cheese"]);
+    expect(resolveSee("dried fruit and apples, strawberries etc", terms)).toEqual(["dried fruit", "apples"]);
+    expect(resolveSee("stews and casseroles", terms)).toEqual(["stews and casseroles"]);
+    expect(resolveSee("smoked haddock", terms)).toEqual(["smoked haddock, scrambled eggs with"]);
+    expect(resolveSee("basil", terms)).toEqual([]);
+  });
+
   it("flags likely misreadings", () => {
     const warnings = checkBook({ ...book, index: [...book.index, { term: "Beef [?]", pages: [960] }, { term: "Lamb", see: "Mutton" }] });
     expect(warnings).toHaveLength(3);
     expect(warnings.join("\n")).toMatch(/p\. 960 is after the last recipe/);
-    expect(warnings.join("\n")).toMatch(/"Mutton", which isn't in the index/);
+    expect(warnings.join("\n")).toMatch(/"Mutton", which matches no heading/);
     expect(warnings.join("\n")).toMatch(/unreadable/);
     expect(checkBook(book)).toEqual([]);
   });

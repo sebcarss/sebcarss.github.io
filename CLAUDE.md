@@ -121,8 +121,11 @@ index transcribed flat: a sub-entry repeats its heading as `term`, ranges keep
 their first page, and each line needs `pages` or `see`. They're bundled into
 the JS, so they work offline. Files are validated leniently with zod (`parseBooks` skips a bad book with a warning),
 and `data.test.ts` fails CI on any invalid file, duplicate title+page,
-duplicate index term+sub, a `see` pointing at no heading, or duplicate book
-name. `example-cookbook.json` is only a placeholder; the render test
+duplicate index term+sub, a `see` that matches no heading, or duplicate book
+name. `resolveSee` (scripts/lib/cookbooks.mjs, also used by `data.ts`) reads
+printed see-lists ("butter beans, white beans etc", "a; b", "x and y") and
+matches a heading exactly or by its start ("smoked haddock" → "smoked
+haddock, scrambled eggs with"). `example-cookbook.json` is only a placeholder; the render test
 mocks `data.ts`, so deleting it is safe.
 
 `engine.ts` `search(query, entries, { book, index })` is pure. Titles and query are
@@ -137,8 +140,8 @@ names with the same `scoreText`; `bookSummaries` gives counts A–Z and
 
 Index search: `toIndexRows` (data.ts) expands each index line × page into
 an `IndexRow` joined to `recipeAt(recipes, page)`, which is the last recipe
-starting ≤ page, within `RECIPE_SPAN` (5) pages, or null. A `see` line takes
-its target heading's pages. `search(..., { index })` scores rows against
+starting ≤ page, within `RECIPE_SPAN` (5) pages, or null. A see-only line takes
+its targets' pages (via `resolveSee`). `search(..., { index })` scores rows against
 "term sub" and "sub" with the same `scoreText`, 50 below a title hit and never
 "exact". Results merge by book|page|title, keeping the better score, so a
 recipe shows once. An index hit carries `via` ("Pork › salo"), which the page

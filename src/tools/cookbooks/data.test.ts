@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { BOOK_FILES, BookSchema, parseBooks, toEntries } from "./data";
-import { titleKey } from "../../../scripts/lib/cookbooks.mjs";
+import { resolveSee, titleKey } from "../../../scripts/lib/cookbooks.mjs";
 
 // Guards the deploy: CI runs these, so a bad hand-edit never reaches the site.
 describe("book files", () => {
@@ -17,12 +17,12 @@ describe("book files", () => {
     expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
   });
 
-  it.each(files)("%s index: no repeated line, and every see points at a heading", (_path, json) => {
+  it.each(files)("%s index: no repeated line, and every see finds a heading", (_path, json) => {
     const index = BookSchema.parse(json).index ?? [];
     const keys = index.map((e) => `${titleKey(e.term)}|${titleKey(e.sub ?? "")}`);
     expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
-    const terms = new Set(index.map((e) => titleKey(e.term)));
-    expect(index.filter((e) => e.see && !terms.has(titleKey(e.see))).map((e) => `${e.term} → ${e.see}`)).toEqual([]);
+    const terms = index.map((e) => e.term);
+    expect(index.filter((e) => e.see && !resolveSee(e.see, terms).length).map((e) => `${e.term} → ${e.see}`)).toEqual([]);
   });
 
   it("book names are unique", () => {

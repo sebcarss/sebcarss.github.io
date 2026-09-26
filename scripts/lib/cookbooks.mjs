@@ -209,6 +209,40 @@ export function mergeBook(existing, incoming) {
 }
 
 /**
+ * The headings a "see" points at. Printed indexes write lists ("butter beans,
+ * white beans etc", "blue cheese; goat's cheese", "dried fruit and apples")
+ * and name a heading by its start ("see smoked haddock" for "smoked haddock,
+ * scrambled eggs with"), so try the whole text, then each part, then each
+ * "and" half. For each name: an exact heading, else one it begins.
+ * @param {string} see
+ * @param {string[]} terms every heading in the book's index
+ * @returns {string[]} matching headings as written, possibly none
+ */
+export function resolveSee(see, terms) {
+  const keys = new Map();
+  for (const t of terms) if (!keys.has(titleKey(t))) keys.set(titleKey(t), t);
+  const find = (/** @type {string} */ name) => {
+    const k = titleKey(name.replace(/\s*\betc\.?\s*$/i, ""));
+    if (!k) return null;
+    if (keys.has(k)) return keys.get(k);
+    for (const [key, t] of keys) if (key.startsWith(k + " ")) return t;
+    return null;
+  };
+  const whole = find(see);
+  if (whole) return [whole];
+  const out = [];
+  for (const part of see.split(/[;,]/)) {
+    const hit = find(part);
+    if (hit) out.push(hit);
+    else for (const half of part.split(/\s+and\s+/)) {
+      const h = find(half);
+      if (h) out.push(h);
+    }
+  }
+  return [...new Set(out)];
+}
+
+/**
  * Things worth a second look in a book that is valid: likely misreadings,
  * not errors.
  * @param {Book} book
@@ -217,11 +251,11 @@ export function mergeBook(existing, incoming) {
 export function checkBook(book) {
   const warnings = [];
   const index = book.index ?? [];
-  const terms = new Set(index.map((e) => titleKey(e.term)));
+  const terms = index.map((e) => e.term);
   const lastRecipe = Math.max(0, ...book.recipes.map((r) => r.page));
   for (const e of index) {
     const name = e.sub ? `${e.term} › ${e.sub}` : e.term;
-    if (e.see && !terms.has(titleKey(e.see))) warnings.push(`"${name}" says see "${e.see}", which isn't in the index (yet?)`);
+    if (e.see && !resolveSee(e.see, terms).length) warnings.push(`"${name}" says see "${e.see}", which matches no heading in the index (yet?)`);
     const late = lastRecipe ? (e.pages ?? []).filter((p) => p > lastRecipe + 10) : [];
     if (late.length) warnings.push(`"${name}" p. ${late.join(", ")} is after the last recipe (p. ${lastRecipe}); misread?`);
     if (/\[\?\]/.test(`${name} ${e.see ?? ""}`)) warnings.push(`"${name}" was marked unreadable [?]; check it and fix the file`);
