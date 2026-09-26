@@ -17,23 +17,42 @@ npm run build        # type-check + production build into dist/
 npm run preview      # serve dist/ (service worker active)
 npm run dev:phone    # dev server over HTTPS on the LAN, for testing on a phone
 npm run add-recipes  # type cookbook recipes in, then commit + push them
+npm run import-book  # paste a book's contents/index JSON (from photos), then commit + push
 ```
 
 ## Adding cookbook recipes
 
 The Cookbook Finder searches JSON files in `src/tools/cookbooks/books/`, one
-per book:
+per book. `index` is optional and is a transcription of the book's printed
+index, so a search for an ingredient or a dish's usual name finds recipes
+whose titles don't mention it:
 
 ```json
 {
-  "book": "Ottolenghi Simple",
+  "book": "Mamushka",
   "recipes": [
-    { "title": "Moussaka", "page": 123 }
+    { "title": "Ukrainian 'narcotics'", "page": 136 }
+  ],
+  "index": [
+    { "term": "Pork", "sub": "salo", "pages": [136] },
+    { "term": "Pork belly", "see": "Salo" },
+    { "term": "Salo", "pages": [80, 117, 136] }
   ]
 }
 ```
 
-The easy way to fill them in is `npm run add-recipes`:
+### From photos (the quick way)
+
+Photograph the contents and index pages, have an AI transcribe them with the
+prompt in [`docs/cookbook-import-prompt.md`](docs/cookbook-import-prompt.md),
+and paste the result into `npm run import-book`. It validates the JSON, merges
+it into the book (batches and re-imports don't duplicate anything), flags
+likely misreadings, and commits and pushes. That file has the full steps,
+including doing it all in Claude Code from a `photos/` folder.
+
+### Typing them in
+
+`npm run add-recipes`:
 
 1. Pick a book by number, or type a new book's name to create its file.
 2. Type one recipe per line as `Moussaka, 123` (or `Moussaka 123`, or
@@ -82,6 +101,8 @@ public/
   icons/                  PWA icons
 scripts/postbuild.mjs     Writes an index.html per route and 404.html into dist/
 scripts/add-recipes.mjs   Interactive cookbook entry → commit → push
+scripts/import-book.mjs   Paste AI-transcribed contents/index JSON → merge → commit → push
+docs/                     The AI prompt for transcribing cookbook pages
 scripts/lib/              Its pure, tested helpers
 ```
 
@@ -105,10 +126,11 @@ scripts/lib/              Its pure, tested helpers
   flour blend, hydration, kansui, egg, cut and crimp, matched against 22
   regional styles.
 - **[Cookbook Finder](https://sebcarss.github.io/food/cookbooks)** — search
-  the cookbooks on my shelf ("moussaka", "pasta bake") and get the book and
-  page. Exact titles come first; close matches and typos still show up. The
-  same box finds books by name, and opening a book lists all its recipes in
-  page order, with a search inside that book.
+  the cookbooks on my shelf ("moussaka", "pasta bake", "salo") and get the
+  book and page. Recipe titles and each book's printed index are both
+  searched. Exact titles come first; close matches and typos still show up.
+  The same box finds books by name, and opening a book lists its recipes in
+  page order, or its index A–Z, with a search inside that book.
 - **[Dreaming of Noodles](https://dreamingofnoodles.com)** — my Japanese food blog.
 
 Recipes save on the device (with a JSON backup/import on the Food page) and

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bookRecipes, bookSummaries, levenshtein, normalize, search, searchBooks, singular, stats } from "./engine";
-import type { Entry } from "./data";
+import { bookIndex, bookRecipes, bookSummaries, levenshtein, normalize, search, searchBooks, singular, stats } from "./engine";
+import { RECIPE_SPAN, recipeAt, toEntries, toIndexRows, type Book, type Entry } from "./data";
 
 const E = (title: string, book = "Book A", page = 1): Entry => ({ title, book, page });
 const ENTRIES: Entry[] = [
@@ -129,5 +129,74 @@ describe("books", () => {
       "82 Baked Pasta with Ricotta",
     ]);
     expect(bookRecipes(ENTRIES, "Nope")).toEqual([]);
+  });
+});
+
+describe("book indexes", () => {
+  const book: Book = {
+    book: "Mamushka",
+    recipes: [
+      { title: "Aromatic roast pork loin", page: 135 },
+      { title: "Ukrainian 'narcotics'", page: 136 },
+      { title: "Garlicky white rabbit", page: 139 },
+      { title: "Borscht", page: 78 },
+    ],
+    index: [
+      { term: "Salo", pages: [80, 136] },
+      { term: "Pork", sub: "salo", pages: [136] },
+      { term: "Pork", sub: "roast loin", pages: [135] },
+      { term: "Pork belly", see: "Salo" },
+      { term: "Rabbit", pages: [139] },
+      { term: "Preserving", pages: [5] },
+    ],
+  };
+  const entries = toEntries([book]);
+  const rows = toIndexRows([book]);
+  const find = (q: string) => search(q, entries, { index: rows });
+
+  it("joins an index page to the recipe it falls in, within a few pages", () => {
+    expect(recipeAt(book.recipes, 136)?.title).toBe("Ukrainian 'narcotics'");
+    expect(recipeAt(book.recipes, 138)?.title).toBe("Ukrainian 'narcotics'");
+    expect(recipeAt(book.recipes, 80)?.title).toBe("Borscht");
+    expect(recipeAt(book.recipes, 5)).toBeNull(); // before the first recipe
+    expect(recipeAt(book.recipes, 139 + RECIPE_SPAN + 1)).toBeNull(); // too far past the last
+  });
+
+  it("finds a recipe by an index term its title doesn't mention", () => {
+    const r = find("salo");
+    expect(r.map((m) => `${m.title} p. ${m.page}`)).toEqual(["Borscht p. 80", "Ukrainian 'narcotics' p. 136"]);
+    expect(r[1]).toMatchObject({ kind: "strong", via: "Salo" });
+  });
+
+  it("follows see references", () => {
+    const strong = find("pork belly").filter((m) => m.kind !== "partial");
+    expect(strong.map((m) => [m.title, m.page, m.via])).toEqual([
+      ["Borscht", 80, "Pork belly → Salo"],
+      ["Ukrainian 'narcotics'", 136, "Pork belly → Salo"],
+    ]);
+  });
+
+  it("lists one recipe once when title and index both match, and ranks titles above index-only hits", () => {
+    const r = find("pork");
+    // "Pork belly → Salo" sends p. 80 (Borscht) too, as the printed index would.
+    expect(r.map((m) => m.title)).toEqual(["Aromatic roast pork loin", "Borscht", "Ukrainian 'narcotics'"]);
+    expect(r[0]!.via).toBeUndefined(); // the title match beat the index line
+    expect(find("rabbit").filter((m) => m.title === "Garlicky white rabbit")).toHaveLength(1);
+  });
+
+  it("names a page with no recipe after its index line", () => {
+    expect(find("preserving")).toEqual([expect.objectContaining({ title: "Preserving", page: 5, via: "Preserving" })]);
+  });
+
+  it("filters index hits by book too", () => {
+    expect(search("salo", entries, { index: rows, book: "Other" })).toEqual([]);
+  });
+
+  it("groups a book's index like the printed one", () => {
+    const groups = bookIndex([...book.index!, { term: "salo", pages: [117, 80] }]);
+    expect(groups.map((g) => g.term)).toEqual(["Pork", "Pork belly", "Preserving", "Rabbit", "Salo"]);
+    expect(groups[0]).toMatchObject({ pages: [], subs: [{ sub: "roast loin", pages: [135] }, { sub: "salo", pages: [136] }] });
+    expect(groups[1]).toMatchObject({ pages: [], see: "Salo" });
+    expect(groups[4]!.pages).toEqual([80, 117, 136]);
   });
 });

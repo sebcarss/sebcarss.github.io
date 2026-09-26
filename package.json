@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "add-recipes": "node scripts/add-recipes.mjs"
+    "add-recipes": "node scripts/add-recipes.mjs",
+    "import-book": "node scripts/import-book.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",

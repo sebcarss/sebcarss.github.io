@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BookSchema } from "../../src/tools/cookbooks/data";
 import {
-  actionsUrl, addRecipe, isDuplicate, parseEntryLine, parsePage, removeRecipe, serializeBook, slugForNewBook, slugify, sortRecipes, validateBook,
+  actionsUrl, addRecipe, checkBook, cleanBook, isDuplicate, mergeBook, parseEntryLine, parseImport, parsePage, removeRecipe, serializeBook, slugForNewBook,
+  slugify, sortRecipes, validateBook,
 } from "./cookbooks.mjs";
 
 describe("parseEntryLine", () => {
@@ -101,6 +102,86 @@ describe("book editing", () => {
     expect(validateBook(null)).toEqual(["not a JSON object"]);
     expect(validateBook({ book: "", recipes: [{ title: "x", page: 0 }] })).toHaveLength(2);
     expect(validateBook({ book: "X" })).toEqual(['"recipes" must be an array']);
+  });
+});
+
+describe("book indexes and imports", () => {
+  const book = {
+    book: "Mamushka",
+    recipes: [{ title: "Ukrainian 'narcotics'", page: 136 }],
+    index: [
+      { term: "Salo", pages: [80, 136] },
+      { term: "Pork", sub: "salo", pages: [136] },
+      { term: "Pork belly", see: "Salo" },
+    ],
+  };
+
+  it("serialises one index line per line, sorted, and round-trips through the site's schema", () => {
+    const text = serializeBook(book);
+    expect(text).toBe(`{
+  "book": "Mamushka",
+  "recipes": [
+    { "title": "Ukrainian 'narcotics'", "page": 136 }
+  ],
+  "index": [
+    { "term": "Pork", "sub": "salo", "pages": [136] },
+    { "term": "Pork belly", "see": "Salo" },
+    { "term": "Salo", "pages": [80, 136] }
+  ]
+}
+`);
+    expect(BookSchema.parse(JSON.parse(text))).toEqual({ ...book, index: expect.arrayContaining(book.index) });
+  });
+
+  it("keeps the index when add-recipes adds or removes a recipe", () => {
+    const b = addRecipe(book, { title: "Soup", page: 3 });
+    expect(b.index).toBe(book.index);
+    expect(removeRecipe(b, { title: "Soup", page: 3 }).index).toBe(book.index);
+  });
+
+  it("validates index lines", () => {
+    expect(validateBook(book)).toEqual([]);
+    expect(validateBook({ ...book, index: "x" })).toEqual(['"index" must be an array']);
+    expect(validateBook({ ...book, index: [{ term: "Salo" }] })).toEqual(['index entry 1 (Salo): needs pages or "see"']);
+    expect(validateBook({ ...book, index: [{ term: "", pages: [1.5] }] })).toHaveLength(2);
+  });
+
+  it("tidies an import: spaces, page order and duplicates", () => {
+    expect(cleanBook({ book: " Mamushka ", recipes: [{ title: "Beef  stew ", page: 4 }], index: [{ term: "Salo ", pages: [136, 80, 136] }, { term: "X", pages: [], see: "Salo" }] })).toEqual({
+      book: "Mamushka",
+      recipes: [{ title: "Beef stew", page: 4 }],
+      index: [{ term: "Salo", pages: [80, 136] }, { term: "X", see: "Salo" }],
+    });
+  });
+
+  it("merges an import without duplicating, unioning an index line's pages", () => {
+    const incoming = {
+      book: "Mamushka",
+      recipes: [{ title: "ukrainian 'narcotics'", page: 136 }, { title: "Borscht", page: 12 }],
+      index: [{ term: "salo", pages: [117] }, { term: "Pork", sub: "salo", pages: [136] }, { term: "Beetroot", pages: [12] }],
+    };
+    const { book: merged, recipes, index } = mergeBook(book, incoming);
+    expect(recipes).toBe(1);
+    expect(index).toBe(2); // Salo gained p. 117, Beetroot is new
+    expect(merged.recipes.map((r) => r.title)).toEqual(["Borscht", "Ukrainian 'narcotics'"]);
+    expect(merged.index).toContainEqual({ term: "Salo", pages: [80, 117, 136] });
+    expect(merged.index).toHaveLength(4);
+    expect(mergeBook(merged, incoming)).toMatchObject({ recipes: 0, index: 0 }); // importing twice is a no-op
+    expect(mergeBook({ book: "New", recipes: [] }, { book: "New", recipes: [] }).book).not.toHaveProperty("index");
+  });
+
+  it("flags likely misreadings", () => {
+    const warnings = checkBook({ ...book, index: [...book.index, { term: "Beef [?]", pages: [960] }, { term: "Lamb", see: "Mutton" }] });
+    expect(warnings).toHaveLength(3);
+    expect(warnings.join("\n")).toMatch(/p\. 960 is after the last recipe/);
+    expect(warnings.join("\n")).toMatch(/"Mutton", which isn't in the index/);
+    expect(warnings.join("\n")).toMatch(/unreadable/);
+    expect(checkBook(book)).toEqual([]);
+  });
+
+  it("reads JSON pasted from an AI chat, fence and chatter included", () => {
+    expect(parseImport('Here it is:\n```json\n{ "book": "B", "recipes": [] }\n```\nFirst: Apple')).toEqual({ book: "B", recipes: [] });
+    expect(() => parseImport("no json here")).toThrow(/No JSON object/);
   });
 });
 

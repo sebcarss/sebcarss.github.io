@@ -4,3 +4,4 @@ dev-dist/
 legacy/
 *.local
 .DS_Store
+photos/

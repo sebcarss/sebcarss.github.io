@@ -10,15 +10,31 @@ import { Ramen } from "@/tools/ramen/Ramen";
 import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
 
 // Fixed books so the smoke test doesn't depend on the real data files.
-vi.mock("@/tools/cookbooks/data", () => ({
-  ENTRIES: [
-    { title: "Pasta Bake", book: "Test Kitchen", page: 34 },
-    { title: "Chicken Pasta", book: "Test Kitchen", page: 36 },
-    { title: "Moussaka", book: "Test Kitchen", page: 12 },
-    { title: "Easy Pasta Bake", book: "Weeknight Suppers", page: 80 },
-    { title: "Tomato Soup", book: "Weeknight Suppers", page: 5 },
-  ],
-}));
+vi.mock("@/tools/cookbooks/data", async (importActual) => {
+  const actual = await importActual<typeof import("@/tools/cookbooks/data")>();
+  const BOOKS = [
+    {
+      book: "Test Kitchen",
+      recipes: [
+        { title: "Pasta Bake", page: 34 },
+        { title: "Chicken Pasta", page: 36 },
+        { title: "Moussaka", page: 12 },
+      ],
+      index: [
+        { term: "Aubergine", pages: [12] },
+        { term: "Cheese", sub: "ricotta", pages: [34] },
+      ],
+    },
+    {
+      book: "Weeknight Suppers",
+      recipes: [
+        { title: "Easy Pasta Bake", page: 80 },
+        { title: "Tomato Soup", page: 5 },
+      ],
+    },
+  ];
+  return { ...actual, BOOKS, ENTRIES: actual.toEntries(BOOKS), INDEX_ROWS: actual.toIndexRows(BOOKS) };
+});
 
 vi.mock("virtual:pwa-register/react", () => ({
   useRegisterSW: () => ({ needRefresh: [false, () => {}], offlineReady: [false, () => {}], updateServiceWorker: async () => {} }),
@@ -132,6 +148,21 @@ describe("pages render", () => {
     fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "moussaka" } });
     fireEvent.click(screen.getByText("Test Kitchen"));
     expect(screen.getByRole("heading", { name: "Test Kitchen" })).toBeTruthy();
+  });
+
+  it("cookbooks: finds a recipe through the book's index, and shows the index", () => {
+    at("/food/cookbooks", <Cookbooks />);
+    fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "aubergine" } });
+    expect(screen.getAllByRole("listitem")[0]!.textContent).toMatch(/MoussakaIndex: AubergineTest Kitchen · p\. 12/);
+    fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "" } });
+    fireEvent.click(screen.getByText("Test Kitchen"));
+    fireEvent.click(screen.getByText("Index"));
+    expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Aubergine12", "Cheesericotta34"]);
+    fireEvent.click(screen.getByText("Recipes"));
+    expect(screen.getByText("Moussaka")).toBeTruthy();
+    fireEvent.click(screen.getByText("‹ All books"));
+    fireEvent.click(screen.getByText("Weeknight Suppers"));
+    expect(screen.queryByText("Index")).toBeNull(); // no index, no toggle
   });
 
   it("cookbooks: an unknown book says so", () => {

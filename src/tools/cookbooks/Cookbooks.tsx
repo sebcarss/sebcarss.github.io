@@ -2,8 +2,9 @@ import { useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ToolPage } from "@/components/ToolPage";
 import { Panel } from "@/components/Panel";
-import { ENTRIES, type Entry } from "./data";
-import { bookRecipes, bookSummaries, search, searchBooks, type BookSummary, type Match } from "./engine";
+import { Toggle } from "@/components/Toggle";
+import { BOOKS, ENTRIES, INDEX_ROWS, type Entry } from "./data";
+import { bookIndex, bookRecipes, bookSummaries, search, searchBooks, type BookSummary, type IndexGroup, type Match } from "./engine";
 
 const BOOK_MATCHES_SHOWN = 5;
 
@@ -35,6 +36,7 @@ function Results({ items, showBook }: { items: (Match | Entry)[]; showBook: bool
           <span>
             {m.title}
             {"kind" in m && m.kind === "exact" && <span className="badge">Exact</span>}
+            {"via" in m && m.via && m.via !== m.title && <span className="via">Index: {m.via}</span>}
           </span>
           <span className="meta">
             {showBook && (
@@ -47,6 +49,30 @@ function Results({ items, showBook }: { items: (Match | Entry)[]; showBook: bool
             )}
             p. {m.page}
           </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const pageList = (pages: number[], see?: string) => [pages.join(", "), see && (pages.length ? `see also ${see}` : `see ${see}`)].filter(Boolean).join("; ");
+
+/** A book's index as printed: headings A–Z with their pages, sub-entries indented. */
+function IndexList({ groups }: { groups: IndexGroup[] }) {
+  return (
+    <ul className="list book-index">
+      {groups.map((g) => (
+        <li key={g.term}>
+          <div className="row">
+            <span className="term">{g.term}</span>
+            <span className="meta">{pageList(g.pages, g.see)}</span>
+          </div>
+          {g.subs.map((s) => (
+            <div className="row sub" key={s.sub}>
+              <span>{s.sub}</span>
+              <span className="meta">{pageList(s.pages, s.see)}</span>
+            </div>
+          ))}
         </li>
       ))}
     </ul>
@@ -75,13 +101,16 @@ export function Cookbooks() {
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const book = params.get("book") ?? "";
+  const view = params.get("view") === "index" ? "index" : "recipes";
   const typing = q.trim() !== "";
   const books = useMemo(() => bookSummaries(ENTRIES), []);
   const open = book ? books.find((b) => b.book === book) : undefined;
 
   const bookMatches = useMemo(() => (typing && !book ? searchBooks(q, books) : []), [q, book, typing, books]);
-  const recipeMatches = useMemo(() => (typing ? search(q, ENTRIES, { book: book || undefined }) : []), [q, book, typing]);
-  const index = useMemo(() => (open ? bookRecipes(ENTRIES, open.book) : []), [open]);
+  const recipeMatches = useMemo(() => (typing ? search(q, ENTRIES, { book: book || undefined, index: INDEX_ROWS }) : []), [q, book, typing]);
+  const contents = useMemo(() => (open ? bookRecipes(ENTRIES, open.book) : []), [open]);
+  const indexGroups = useMemo(() => bookIndex((open && BOOKS.find((b) => b.book === open.book)?.index) || []), [open]);
+  const indexed = BOOKS.filter((b) => b.index?.length).length;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -92,6 +121,12 @@ export function Cookbooks() {
     const next = new URLSearchParams(params);
     if (value) next.set("q", value);
     else next.delete("q");
+    setParams(next, { replace: true });
+  };
+  const setView = (value: "recipes" | "index") => {
+    const next = new URLSearchParams(params);
+    if (value === "index") next.set("view", value);
+    else next.delete("view");
     setParams(next, { replace: true });
   };
 
@@ -115,7 +150,7 @@ export function Cookbooks() {
     <ToolPage
       emoji="📚"
       title="Cookbook Finder"
-      blurb="Which of my cookbooks has that recipe? Search by recipe or book — close matches count too — or browse a book's recipes."
+      blurb="Which of my cookbooks has that recipe? Search by recipe, ingredient or book — the books' indexes and close matches count too — or browse a book's recipes."
     >
       {book ? (
         <Panel>
@@ -127,7 +162,24 @@ export function Cookbooks() {
               <h2>{open.book}</h2>
               <p className="note book-count">{plural(open.recipes, "recipe")}</p>
               {searchBox}
-              {typing ? <RecipeMatches matches={recipeMatches} showBook={false} /> : <Results items={index} showBook={false} />}
+              {typing ? (
+                <RecipeMatches matches={recipeMatches} showBook={false} />
+              ) : (
+                <>
+                  {indexGroups.length > 0 && (
+                    <Toggle
+                      label="Show"
+                      value={view}
+                      onChange={setView}
+                      options={[
+                        { value: "recipes", label: "Recipes" },
+                        { value: "index", label: "Index" },
+                      ]}
+                    />
+                  )}
+                  {view === "index" && indexGroups.length > 0 ? <IndexList groups={indexGroups} /> : <Results items={contents} showBook={false} />}
+                </>
+              )}
             </>
           ) : (
             <>
@@ -141,7 +193,8 @@ export function Cookbooks() {
           <Panel title="Search">
             {searchBox}
             <p className="note">
-              {plural(ENTRIES.length, "recipe")} across {plural(books.length, "book")}.
+              {plural(ENTRIES.length, "recipe")} across {plural(books.length, "book")}
+              {indexed > 0 && <>, with the index of {plural(indexed, "book")} searched too</>}.
             </p>
           </Panel>
 

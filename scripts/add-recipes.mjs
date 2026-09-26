@@ -7,59 +7,16 @@
 //
 // The book file is rewritten after every recipe, so Ctrl-C never loses work.
 import { createInterface } from "node:readline/promises";
-import { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  actionsUrl, addRecipe, isDuplicate, parseEntryLine, parsePage, removeRecipe, serializeBook, slugForNewBook, validateBook,
-} from "./lib/cookbooks.mjs";
+import { addRecipe, isDuplicate, parseEntryLine, parsePage, removeRecipe, serializeBook, slugForNewBook } from "./lib/cookbooks.mjs";
+import { BOOKS_DIR, commitAndPush, dim, green, loadBooks, root, startOnMaster, yellow } from "./lib/cli.mjs";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
-const BOOKS_DIR = join(root, "src/tools/cookbooks/books");
 const useGit = !process.argv.includes("--no-git");
-
-const dim = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
-const green = (s) => (process.stdout.isTTY ? `\x1b[32m${s}\x1b[0m` : s);
-const yellow = (s) => (process.stdout.isTTY ? `\x1b[33m${s}\x1b[0m` : s);
-
-const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
 const HELP = `  Type one recipe per line as ${green("Title, page")} (e.g. "Moussaka, 123"), or just the title and you'll be asked for the page.
   Commands: ${green("undo")} (remove the last one), ${green("list")} (show this session), ${green("quit")} (discard this session), ${green("help")}.
   Press Enter on an empty line when you've finished the book.`;
-
-function loadBooks() {
-  if (!existsSync(BOOKS_DIR)) return [];
-  return readdirSync(BOOKS_DIR)
-    .filter((f) => f.endsWith(".json"))
-    .flatMap((f) => {
-      const file = join(BOOKS_DIR, f);
-      try {
-        const data = JSON.parse(readFileSync(file, "utf8"));
-        const errors = validateBook(data);
-        if (errors.length) {
-          console.warn(yellow(`Skipping ${f}: ${errors.join("; ")}`));
-          return [];
-        }
-        return [{ file, slug: f.slice(0, -5), data }];
-      } catch (e) {
-        console.warn(yellow(`Skipping ${f}: ${e.message}`));
-        return [];
-      }
-    })
-    .sort((a, b) => a.data.book.localeCompare(b.data.book));
-}
-
-function gitStep(label, args) {
-  try {
-    git(...args);
-    return true;
-  } catch (e) {
-    console.error(yellow(`\n${label} failed:\n${(e.stderr || e.message).trim()}`));
-    return false;
-  }
-}
 
 async function main() {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -86,21 +43,7 @@ async function main() {
     return !eof && !/^n/i.test(ans);
   };
 
-  if (useGit) {
-    let branch = "";
-    try {
-      branch = git("rev-parse", "--abbrev-ref", "HEAD");
-    } catch {
-      console.error("This isn't a git checkout. Run with --no-git to only edit the files.");
-      process.exit(1);
-    }
-    if (branch !== "master") {
-      console.error(`You're on "${branch}"; the site deploys from master. Switch branch or run with --no-git.`);
-      process.exit(1);
-    }
-    // Start from the latest data so the push at the end doesn't conflict.
-    if (!gitStep("git pull", ["pull", "--rebase", "--autostash", "--quiet"])) console.log(dim("Carrying on offline; you can push later."));
-  }
+  if (useGit) startOnMaster();
 
   // 1. Pick a book.
   const books = loadBooks();
@@ -195,22 +138,7 @@ async function main() {
     return;
   }
   rl.close();
-  const message = `Cookbooks: add ${added.length} recipe${added.length === 1 ? "" : "s"} to ${book.book}`;
-  // Commit only the book file, whatever else is lying around in the tree.
-  const ok =
-    gitStep("git add", ["add", "--", rel]) &&
-    gitStep("git commit", ["commit", "--quiet", "-m", message, "--", rel]) &&
-    gitStep("git pull", ["pull", "--rebase", "--autostash", "--quiet"]) &&
-    gitStep("git push", ["push", "--quiet"]);
-  if (!ok) {
-    console.error(`\nYour recipes are saved in ${rel}. Fix the problem above, then run: git push`);
-    process.exit(1);
-  }
-  let url = null;
-  try {
-    url = actionsUrl(git("remote", "get-url", "origin"));
-  } catch {}
-  console.log(green(`\nPushed "${message}".`) + ` The site updates in a minute or two${url ? `: ${url}` : "."}`);
+  commitAndPush(rel, `Cookbooks: add ${added.length} recipe${added.length === 1 ? "" : "s"} to ${book.book}`);
 }
 
 main().catch((e) => {

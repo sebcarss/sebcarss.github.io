@@ -17,6 +17,14 @@ describe("book files", () => {
     expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
   });
 
+  it.each(files)("%s index: no repeated line, and every see points at a heading", (_path, json) => {
+    const index = BookSchema.parse(json).index ?? [];
+    const keys = index.map((e) => `${titleKey(e.term)}|${titleKey(e.sub ?? "")}`);
+    expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
+    const terms = new Set(index.map((e) => titleKey(e.term)));
+    expect(index.filter((e) => e.see && !terms.has(titleKey(e.see))).map((e) => `${e.term} → ${e.see}`)).toEqual([]);
+  });
+
   it("book names are unique", () => {
     const names = files.map(([, json]) => BookSchema.parse(json).book.trim().toLowerCase());
     expect(new Set(names).size).toBe(names.length);
@@ -34,5 +42,12 @@ describe("parseBooks", () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(toEntries(books)).toEqual([{ title: "Soup", book: "Good", page: 3 }]);
     warn.mockRestore();
+  });
+
+  it("accepts an index and rejects a line with neither pages nor see", () => {
+    const ok = { book: "B", recipes: [], index: [{ term: "Salo", pages: [3] }, { term: "Pork belly", see: "Salo" }] };
+    expect(BookSchema.safeParse(ok).success).toBe(true);
+    expect(BookSchema.safeParse({ ...ok, index: [{ term: "Salo" }] }).success).toBe(false);
+    expect(BookSchema.safeParse({ ...ok, index: [{ term: "Salo", pages: [0] }] }).success).toBe(false);
   });
 });

@@ -18,9 +18,10 @@ Seb Carss's personal homepage at sebcarss.github.io. Two halves:
 Commands: `npm run dev`, `npm test` (vitest), `npm run build` (runs `tsc
 --noEmit` first, then `scripts/postbuild.mjs`), `npm run preview`,
 `npm run dev:phone` (HTTPS on the LAN), `npm run add-recipes` (interactive
-cookbook entry that commits and pushes; see below). Deployed by
-`.github/workflows/deploy.yml` on push to `master` (Pages source must be
-"GitHub Actions"). `dist/` is generated; never commit it.
+cookbook entry that commits and pushes) and `npm run import-book` (merge
+AI-transcribed contents/index JSON, then commit and push; see below).
+Deployed by `.github/workflows/deploy.yml` on push to `master` (Pages source
+must be "GitHub Actions"). `dist/` is generated; never commit it.
 
 ## Architecture rules
 
@@ -114,14 +115,17 @@ rank its own style first for all 22 — that invariant is a test.
 
 A search page rather than a calculator: no `compute`, `state.ts`, `useDraft`
 or `RecipeBar`. Data is one JSON file per book in `books/`
-(`{ book, recipes: [{ title, page }] }`), loaded with `import.meta.glob` in
-`data.ts`. They're bundled into the JS, so they work offline. Files are
-validated leniently with zod (`parseBooks` skips a bad book with a warning),
-and `data.test.ts` fails CI on any invalid file, duplicate title+page or
-duplicate book name. `example-cookbook.json` is only a placeholder; the render test
+(`{ book, recipes: [{ title, page }], index?: [{ term, sub?, pages?, see? }] }`),
+loaded with `import.meta.glob` in `data.ts`. `index` is the book's printed
+index transcribed flat: a sub-entry repeats its heading as `term`, ranges keep
+their first page, and each line needs `pages` or `see`. They're bundled into
+the JS, so they work offline. Files are validated leniently with zod (`parseBooks` skips a bad book with a warning),
+and `data.test.ts` fails CI on any invalid file, duplicate title+page,
+duplicate index term+sub, a `see` pointing at no heading, or duplicate book
+name. `example-cookbook.json` is only a placeholder; the render test
 mocks `data.ts`, so deleting it is safe.
 
-`engine.ts` `search(query, entries, { book })` is pure. Titles and query are
+`engine.ts` `search(query, entries, { book, index })` is pure. Titles and query are
 normalised (accents, case, `&`→and, punctuation) and lightly singularised,
 then scored: exact title 1000 → title contains the query phrase 700–800 →
 every non-stopword query word matches 550–650 (all "strong") → some match,
@@ -131,23 +135,48 @@ Levenshtein 1 (5+ chars) / 2 (8+ chars) (0.8). `searchBooks` scores book
 names with the same `scoreText`; `bookSummaries` gives counts A–Z and
 `bookRecipes` one book in page order.
 
+Index search: `toIndexRows` (data.ts) expands each index line × page into
+an `IndexRow` joined to `recipeAt(recipes, page)`, which is the last recipe
+starting ≤ page, within `RECIPE_SPAN` (5) pages, or null. A `see` line takes
+its target heading's pages. `search(..., { index })` scores rows against
+"term sub" and "sub" with the same `scoreText`, 50 below a title hit and never
+"exact". Results merge by book|page|title, keeping the better score, so a
+recipe shows once. An index hit carries `via` ("Pork › salo"), which the page
+shows under the title. A page with no recipe is titled by its index label.
+`bookIndex` groups a book's lines A–Z for the Index view.
+
 The page has three states driven by the URL:
 - no `q` and no `book`: the list of all books
 - `q` only: matching books (top 5, the rest behind "Show all") above the
   recipe results, where each book name links to its book
-- `book`: that book's recipes in page order, and the box searches only
-  that book ("Book not found" for an unknown name)
+- `book`: that book's recipes in page order, or with `view=index` (a
+  Recipes | Index `Toggle`, shown only when the book has an index) its index
+  as printed. The box searches only that book ("Book not found" for an
+  unknown name)
 
 Opening a book is a `<Link>` (pushes history, drops `q`) so Back works;
 typing uses `setParams(..., { replace: true })`. There is no book `<select>`
-any more. The render tests mock `data.ts` with two books.
+any more. The render tests mock `data.ts` with two books (built through the
+real `toEntries`/`toIndexRows`), and one of them has an index.
 
-`scripts/add-recipes.mjs` is the only way data gets in besides hand edits.
-It must stay plain Node ESM (the local Node is 20, so no TS). Its logic lives
-in `scripts/lib/cookbooks.mjs` (parse `Title, page` lines, slugify, sort,
-duplicate check, one-recipe-per-line `serializeBook`) with tests in
-`cookbooks.test.ts`, which round-trip through `BookSchema`, so keep the two
-formats in sync. It rewrites the book file after every entry, requires
-`master`, and commits only that file (`git commit -- <file>`, then `pull
---rebase --autostash`, then push). It reads input via the readline async
-iterator so piped/pasted lines aren't dropped.
+Data gets in through two scripts, or by hand edits. Both must stay plain Node
+ESM (the local Node is 20, so no TS).
+- `scripts/add-recipes.mjs`: type `Title, page` lines. It rewrites the book
+  file after every entry.
+- `scripts/import-book.mjs`: paste (or pass a file of) the JSON an AI
+  produced from photos with `docs/cookbook-import-prompt.md`. `parseImport`
+  strips fences and chatter, then `validateBook` → `cleanBook` → `mergeBook`
+  (dedupes recipes by `titleKey`+page and index lines by term+sub, unioning
+  pages) → `checkBook` warnings. When asked to import from `photos/<book>/`
+  (git-ignored), follow that prompt, write the JSON to the scratchpad and run
+  `npm run import-book -- <file> --no-git`, then `npm test`.
+
+Their pure logic lives in `scripts/lib/cookbooks.mjs` (parsing, slugify,
+sorting, merge, and `serializeBook`, which writes one recipe or index line per
+line and must keep `index`). Tests are in `cookbooks.test.ts`, which
+round-trips through `BookSchema`, so keep the two formats in sync.
+`scripts/lib/cli.mjs` holds the shared terminal/git plumbing: `loadBooks`,
+`startOnMaster` (requires `master`, pulls), and `commitAndPush` (commits
+only that file with `git commit -- <file>`, then `pull --rebase --autostash`,
+then push). Input is read via the readline async iterator, never
+`for await` (which closes readline), so piped or pasted lines aren't dropped.

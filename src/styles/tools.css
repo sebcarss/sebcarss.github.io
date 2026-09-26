@@ -171,6 +171,12 @@ textarea { width: 100%; min-height: 4.5rem; resize: vertical; }
 .book-count { margin: -0.5rem 0 0.85rem; }
 .more summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; padding: 0.5rem 0; }
 .badge { display: inline-block; margin-left: 0.5rem; padding: 0 0.45rem; border-radius: 999px; background: var(--ok-soft); color: var(--ok); font-size: 0.75rem; font-weight: 600; vertical-align: 0.1em; }
+.results .via { display: block; color: var(--muted); font-size: 0.8rem; }
+.book-index li { display: block; }
+.book-index .row { display: flex; justify-content: space-between; gap: 0.75rem; }
+.book-index .term { font-weight: 600; }
+.book-index .sub { padding-left: 1rem; font-size: 0.9rem; }
+.book-index .meta { text-align: right; }
 
 /* Custom ingredient form */
 .ing-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: 0.5rem; align-items: end; }
