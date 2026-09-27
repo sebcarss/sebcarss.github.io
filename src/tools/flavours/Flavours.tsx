@@ -1,10 +1,11 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ToolPage } from "@/components/ToolPage";
 import { Panel } from "@/components/Panel";
 import { Toggle } from "@/components/Toggle";
 import { FLAVOURS, KINDS, REGIONS, type Kind, type Region } from "./data";
 import { suggest, type Suggestion } from "./engine";
+import { LIBRARY } from "./FlavourDetail";
 
 const KIND_LABEL: Record<Kind, string> = { rub: "Rubs", marinade: "Marinades", sauce: "Sauces" };
 // One tap adds (or removes) a common ingredient from the box.
@@ -24,16 +25,20 @@ function Card({ s }: { s: Suggestion }) {
   const f = s.flavour;
   return (
     <li className="flavour">
-      <span className="name">{f.name}</span>
-      <span className="meta">
-        {f.cuisine}
-        {f.heat ? <span aria-label={`heat ${f.heat} of 3`}> · {"🌶".repeat(f.heat)}</span> : null}
-      </span>
-      <span className="about">{f.about}</span>
-      <span className="note">
-        Goes with {f.pairsWith.map((t) => (s.matched.includes(t) ? <strong key={t}>{t} </strong> : t + " "))}
-        {f.cooking && <> · {f.cooking.join(", ")}</>}
-      </span>
+      <Link className="row" to={`${LIBRARY}/${f.id}`}>
+        <span className="text">
+          <span className="name">{f.name}</span>
+          <span className="meta">
+            {f.cuisine}
+            {f.heat ? <span aria-label={`heat ${f.heat} of 3`}> · {"🌶".repeat(f.heat)}</span> : null}
+          </span>
+          <span className="about">{f.about}</span>
+          <span className="note">
+            Goes with {f.pairsWith.map((t) => (s.matched.includes(t) ? <strong key={t}>{t} </strong> : t + " "))}
+            {f.cooking && <> · {f.cooking.join(", ")}</>}
+          </span>
+        </span>
+      </Link>
     </li>
   );
 }
@@ -99,7 +104,7 @@ export function Flavours() {
           </select>
         </div>
         <p className="note">
-          {FLAVOURS.length} rubs, marinades and sauces. Look up a recipe for any of them yourself.
+          {FLAVOURS.length} rubs, marinades and sauces. Tap one to read about it and search for a recipe.
         </p>
       </Panel>
 

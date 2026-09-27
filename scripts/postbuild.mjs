@@ -2,11 +2,12 @@
 // of index.html (a real 200 on deep links) and 404.html doubles as the
 // fallback for anything else. The music tools are real files under
 // public/music and are untouched.
-import { copyFileSync, mkdirSync, existsSync } from "node:fs";
+import { copyFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const dist = new URL("../dist/", import.meta.url).pathname;
 const index = join(dist, "index.html");
+const flavours = JSON.parse(readFileSync(new URL("../src/tools/flavours/flavours.json", import.meta.url), "utf8"));
 
 // Keep in sync with src/routes.tsx.
 const routes = [
@@ -16,6 +17,8 @@ const routes = [
   "food/ramen-noodles",
   "food/cookbooks",
   "food/flavour-library",
+  // One page per rub, marinade or sauce.
+  ...flavours.map((f) => `food/flavour-library/${f.id}`),
   "guitar",
   // One per course, plus its days (src/tools/guitar/registry.ts).
   "guitar/fingerpicking",

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, ScrollRestoration } from "react-router-dom";
 import { UpdateToast } from "./UpdateToast";
 
 export function Layout() {
@@ -27,6 +27,8 @@ export function Layout() {
         </div>
       </footer>
       <UpdateToast />
+      {/* Back returns to where you were in a list (e.g. the Flavour Library). */}
+      <ScrollRestoration />
     </>
   );
 }

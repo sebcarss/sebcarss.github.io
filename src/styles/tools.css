@@ -236,8 +236,21 @@ textarea { width: 100%; min-height: 4.5rem; resize: vertical; }
 .filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .filters .toggle { margin-bottom: 0; }
 .filters select { min-height: 2.1rem; }
-.flavours li.flavour { flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.55rem 0; }
+.flavours li.flavour { padding: 0; }
+.flavours a.row { align-items: center; padding: 0.55rem 0.4rem; }
+.flavours a.row .text { display: flex; flex-direction: column; gap: 0.1rem; }
 .flavour .name { font-weight: 600; }
 .flavour .about { margin: 0.15rem 0; }
 .flavour .note { margin: 0; }
 .flavour .note strong { color: var(--text); }
+
+/* Flavour Library: one rub, marinade or sauce */
+.flavour-detail { margin-bottom: 1.5rem; }
+.flavour-detail .kicker { font-size: 0.9rem; margin-bottom: 0.35rem; }
+.flavour-detail p.lead { color: var(--text); font-size: 1.2rem; line-height: 1.6; max-width: 40rem; margin-top: 0.75rem; }
+.flavour-detail .actions { margin-top: 1.25rem; }
+.flavour-detail a.btn { display: inline-block; text-decoration: none; padding: 0.6rem 1.1rem; font-size: 1rem; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.45rem 1rem; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.flavours .about { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

@@ -43,12 +43,16 @@ const PROTEIN_SET = new Set<Tag>(PROTEINS);
 const PROTEIN_WEIGHT = 3;
 const SIDE_WEIGHT = 1;
 const NAME_WEIGHT = 5;
+// Words from the description ("citrusy", "nutty", "smoky") count, but a name
+// or cuisine hit still comes first.
+const ABOUT_WEIGHT = 2;
 
 const words = (s: string) => normalize(s).split(" ").filter(Boolean).map(singular);
 
 /**
  * Map free text ("beef steak, green beans") to tags plus the words that
- * weren't recognised (which are matched against names and cuisines instead).
+ * weren't recognised (which are matched against names, cuisines and
+ * descriptions instead).
  * Two-word synonyms ("sweet potato") are tried before single words.
  */
 export function parseIngredients(text: string): { tags: Tag[]; rest: string[] } {
@@ -87,7 +91,8 @@ export interface Query {
 /**
  * Rank the library for what's in the fridge. With no text, everything that
  * passes the filters comes back A–Z. Otherwise a recipe needs at least one
- * matching tag or a name/cuisine hit; higher scores first, then A–Z.
+ * matching tag or a name/cuisine/description hit; higher scores first, then
+ * A–Z.
  */
 export function suggest(q: Query, flavours: Flavour[]): Suggestion[] {
   const pool = flavours.filter((f) => (!q.kind || f.kind === q.kind) && (!q.region || f.region === q.region));
@@ -101,7 +106,8 @@ export function suggest(q: Query, flavours: Flavour[]): Suggestion[] {
     let score = matched.reduce((s, t) => s + (PROTEIN_SET.has(t) ? PROTEIN_WEIGHT : SIDE_WEIGHT), 0);
     if (rest.length) {
       const nameWords = words(`${f.name} ${f.cuisine}`);
-      score += rest.reduce((s, w) => s + NAME_WEIGHT * wordMatch(w, nameWords), 0);
+      const aboutWords = words(f.about);
+      score += rest.reduce((s, w) => s + NAME_WEIGHT * wordMatch(w, nameWords) + ABOUT_WEIGHT * wordMatch(w, aboutWords), 0);
     }
     if (score > 0) out.push({ flavour: f, score, matched });
   }

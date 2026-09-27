@@ -238,7 +238,7 @@ some greens" → rubs, marinades and sauces that go with it.
   (e.g. ponzu is citrusy, sweet-sour and salty) and what it suits. It may
   name the defining ingredients but never quantities, method or timings.
   No ingredient lists, methods or links to recipe sites (copyright: Seb
-  looks the recipes up himself). Don't add them back; `data.test.ts` fails
+  looks the recipes up himself, via the detail page's Google search button). Don't add them back; `data.test.ts` fails
   on any other key, a URL, or a number/measure/step in `about`.
 - Entries are validated by `FlavourSchema` in `data.ts`. `pairsWith` uses
   the fixed `TAGS` (proteins + sides; `steak` and `salmon` are narrower tags
@@ -248,8 +248,15 @@ some greens" → rubs, marinades and sauces that go with it.
   chop, thigh…) only count when no protein is named, so "salmon fillet"
   isn't steak. Score = 3 per protein tag + 1 per side tag + 5 × `wordMatch`
   for the leftover words against name + cuisine (so "diane" or "korean"
-  work), reusing the Cookbook Finder's `normalize`/`singular`/`wordMatch`.
+  work) + 2 × `wordMatch` against `about` (so "citrusy" or "nutty" work),
+  reusing the Cookbook Finder's `normalize`/`singular`/`wordMatch`.
   No text lists everything A–Z.
+- Each card links to `FlavourDetail.tsx` at `/food/flavour-library/<id>`:
+  the description large, the pairings, and a "Search for a recipe" button
+  (`recipeSearchUrl`: Google for "<name without brackets> recipe", new
+  tab). Its back link does `navigate(-1)` when you came from the list, so
+  the search is kept, and `<ScrollRestoration>` in `Layout` restores the
+  scroll. `postbuild.mjs` writes a page per id from `flavours.json`.
 
 ## Guitar School (`src/tools/guitar/`)
 

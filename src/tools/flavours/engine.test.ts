@@ -57,6 +57,14 @@ describe("suggest", () => {
     expect(ids("chimmichurri")[0]).toBe("chimichurri"); // typo
   });
 
+  it("finds recipes by what the description says they taste like", () => {
+    expect(ids("citrusy")).toContain("ponzu");
+    expect(ids("nutty")).toContain("dukkah");
+    expect(ids("smoky")).toContain("berbere");
+    expect(ids("ponzu")[0]).toBe("ponzu"); // a name still beats a mention
+    expect(ids("fish citrusy").indexOf("ponzu")).toBeLessThan(ids("fish").indexOf("ponzu"));
+  });
+
   it("no text lists everything A–Z; nonsense lists nothing", () => {
     const all = suggest({ text: "" }, FLAVOURS);
     expect(all).toHaveLength(FLAVOURS.length);

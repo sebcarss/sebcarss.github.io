@@ -9,6 +9,7 @@ import { Bread } from "@/tools/bread/Bread";
 import { Ramen } from "@/tools/ramen/Ramen";
 import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
 import { Flavours } from "@/tools/flavours/Flavours";
+import { FlavourDetail } from "@/tools/flavours/FlavourDetail";
 import { Guitar } from "@/tools/guitar/pages/Guitar";
 import { Course } from "@/tools/guitar/pages/Course";
 import { Day } from "@/tools/guitar/pages/Day";
@@ -209,15 +210,14 @@ describe("pages render", () => {
     expect(screen.getByText("Book not found")).toBeTruthy();
   });
 
-  it("flavours: suggests for what you've got, with no recipes or links, and filters", () => {
+  it("flavours: suggests for what you've got, and filters", () => {
     at("/food/flavour-library", <Flavours />);
     expect(screen.getByText(/Sauces \(\d+\)/)).toBeTruthy(); // browse: everything
     fireEvent.change(screen.getByLabelText("Ingredients"), { target: { value: "steak, broccoli" } });
     const diane = screen.getByText("Diane sauce").closest("li")!;
     expect(diane.textContent).toMatch(/Goes with .*steak/);
     expect(diane.querySelector(".about")!.textContent).toMatch(/creamy/); // what it tastes like
-    expect(within(diane).queryAllByRole("link")).toHaveLength(0);
-    expect(document.querySelectorAll(".flavours a")).toHaveLength(0);
+    expect(diane.querySelector("a")!.getAttribute("href")).toBe("/food/flavour-library/diane");
     fireEvent.click(screen.getByRole("button", { name: "Rubs" }));
     expect(screen.queryByText("Diane sauce")).toBeNull();
     expect(screen.queryByText(/Sauces \(/)).toBeNull();
@@ -229,6 +229,39 @@ describe("pages render", () => {
     expect(screen.getByText("Teriyaki sauce")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Ingredients"), { target: { value: "xyzzy" } });
     expect(screen.getByText(/Nothing matches/)).toBeTruthy();
+  });
+
+  const flavourAt = (path: string) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/food/flavour-library/:id" element={<FlavourDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("flavours: a card opens its own page with a recipe search, and back returns to the list", () => {
+    render(
+      <MemoryRouter initialEntries={["/food/flavour-library?q=fish"]}>
+        <Routes>
+          <Route path="/food/flavour-library" element={<Flavours />} />
+          <Route path="/food/flavour-library/:id" element={<FlavourDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText("Ponzu"));
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Ponzu");
+    expect(screen.getByText(/citrus-soy/)).toBeTruthy();
+    const search = screen.getByRole("link", { name: /Search for a recipe/ });
+    expect(search.getAttribute("href")).toBe("https://www.google.com/search?q=Ponzu%20recipe");
+    fireEvent.click(screen.getByText(/‹ Flavour Library/));
+    expect((screen.getByLabelText("Ingredients") as HTMLInputElement).value).toBe("fish");
+    cleanup();
+    flavourAt("/food/flavour-library/texas-spg-rub");
+    expect(screen.getByRole("link", { name: /Search for a recipe/ }).getAttribute("href")).toBe("https://www.google.com/search?q=Texas%20SPG%20rub%20recipe");
+    cleanup();
+    flavourAt("/food/flavour-library/nope");
+    expect(screen.getByText(/isn't in the library/)).toBeTruthy();
   });
 
   it("guitar: the hub lists the finger picking course and the course shows its plan and tests", () => {
