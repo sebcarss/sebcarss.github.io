@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FLAVOURS } from "./data";
-import { formatIngredient, formatQty, parseIngredients, suggest } from "./engine";
+import { parseIngredients, suggest } from "./engine";
 
 const ids = (text: string, extra: Partial<Parameters<typeof suggest>[0]> = {}) => suggest({ text, ...extra }, FLAVOURS).map((s) => s.flavour.id);
 
@@ -63,21 +63,5 @@ describe("suggest", () => {
     const names = all.map((s) => s.flavour.name);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
     expect(ids("xyzzy")).toEqual([]);
-  });
-});
-
-describe("formatting", () => {
-  it("formats quantities with fractions", () => {
-    expect(formatQty(1.5)).toBe("1½");
-    expect(formatQty(0.25)).toBe("¼");
-    expect(formatQty(57)).toBe("57");
-    expect(formatQty(2.5)).toBe("2½");
-  });
-
-  it("formats ingredients", () => {
-    expect(formatIngredient({ qty: 2, max: 3, unit: "tbsp", item: "sherry vinegar" })).toBe("2–3 tbsp sherry vinegar");
-    expect(formatIngredient({ qty: 180, unit: "g", item: "mushrooms" })).toBe("180g mushrooms");
-    expect(formatIngredient({ qty: 3, item: "garlic cloves" })).toBe("3 garlic cloves");
-    expect(formatIngredient({ item: "salt, to taste" })).toBe("salt, to taste");
   });
 });

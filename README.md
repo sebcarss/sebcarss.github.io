@@ -95,7 +95,7 @@ src/
   tools/bread/            Baker's percentage calculator
   tools/ramen/            Ramen noodle calculator
   tools/cookbooks/        Cookbook Finder: search engine, page and books/*.json data
-  tools/flavours/         Flavour Library: world rubs, marinades & sauces (recipes.json)
+  tools/flavours/         Flavour Library: which rubs, marinades & sauces go with what (flavours.json)
   pages/                  Home, Food (+ backup), NotFound
   styles/                 global.css (tokens, light + dark) and tools.css
 public/

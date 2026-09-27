@@ -1,5 +1,5 @@
 import { normalize, singular, wordMatch } from "@/tools/cookbooks/engine";
-import { PROTEINS, type Flavour, type Ingredient, type Kind, type Region, type Tag } from "./data";
+import { PROTEINS, type Flavour, type Kind, type Region, type Tag } from "./data";
 
 // Words people type → the tags recipes are paired by. Keys are normalised and
 // singular (see `words`). A word can point at several tags: "steak" is beef too.
@@ -106,22 +106,4 @@ export function suggest(q: Query, flavours: Flavour[]): Suggestion[] {
     if (score > 0) out.push({ flavour: f, score, matched });
   }
   return out.sort((a, b) => b.score - a.score || byName(a, b));
-}
-
-const FRACTIONS: Record<string, string> = { "0.25": "¼", "0.5": "½", "0.75": "¾" };
-
-/** 1.5 → "1½", 0.25 → "¼", 2.25 → "2¼", 57 → "57". */
-export function formatQty(n: number): string {
-  const whole = Math.floor(n);
-  const frac = FRACTIONS[String(Math.round((n - whole) * 100) / 100)];
-  if (frac) return (whole ? String(whole) : "") + frac;
-  return String(Math.round(n * 100) / 100);
-}
-
-/** "2–3 tbsp sherry vinegar", "1 pinch salt", "3 garlic cloves", "salt, to taste". */
-export function formatIngredient(i: Ingredient): string {
-  if (i.qty === undefined) return i.item;
-  const qty = formatQty(i.qty) + (i.max ? "–" + formatQty(i.max) : "");
-  const unit = i.unit ? (["g", "kg", "ml", "l", "cm"].includes(i.unit) ? i.unit : " " + i.unit) : "";
-  return `${qty}${unit} ${i.item}`;
 }

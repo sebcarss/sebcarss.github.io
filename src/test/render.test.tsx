@@ -209,17 +209,14 @@ describe("pages render", () => {
     expect(screen.getByText("Book not found")).toBeTruthy();
   });
 
-  it("flavours: suggests for what you've got, shows the source or the AI flag, and filters", () => {
+  it("flavours: suggests for what you've got, with no recipes or links, and filters", () => {
     at("/food/flavour-library", <Flavours />);
     expect(screen.getByText(/Sauces \(\d+\)/)).toBeTruthy(); // browse: everything
     fireEvent.change(screen.getByLabelText("Ingredients"), { target: { value: "steak, broccoli" } });
-    const diane = screen.getByText("Diane sauce").closest("details")!;
-    expect(diane.textContent).toMatch(/BBC Food/);
-    fireEvent.click(diane.querySelector("summary")!);
-    const link = within(diane).getByRole("link");
-    expect(link.getAttribute("href")).toBe("https://www.bbc.co.uk/food/recipes/diane_sauce_57749");
-    expect(diane.textContent).toMatch(/300ml double cream/);
-    expect(screen.getByText("Texas SPG rub (salt, pepper, garlic)").closest("details")!.textContent).toMatch(/AI generated/);
+    const diane = screen.getByText("Diane sauce").closest("li")!;
+    expect(diane.textContent).toMatch(/Goes with .*steak/);
+    expect(within(diane).queryAllByRole("link")).toHaveLength(0);
+    expect(document.querySelectorAll(".flavours a")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Rubs" }));
     expect(screen.queryByText("Diane sauce")).toBeNull();
     expect(screen.queryByText(/Sauces \(/)).toBeNull();

@@ -231,19 +231,15 @@ A search page like the Cookbook Finder (no `compute`, `useDraft` or
 `RecipeBar`; state is the URL: `q`, `kind`, `region`). "I have a steak and
 some greens" → rubs, marinades and sauces that go with it.
 
-- `recipes.json`: one entry per recipe, validated by `FlavourSchema` in
-  `data.ts`. `pairsWith` uses the fixed `TAGS` (proteins + sides; `steak` and
-  `salmon` are narrower tags that sit on top of `beef` and `fish`).
-- **Sources.** Every recipe was checked against a recipe site reachable from
-  the dev container (`SOURCE_HOSTS`, from the firewall allowlist in
-  `/workspace/.devcontainer/init-firewall.sh`). `source` is the page it was
-  checked against. `source: null` means no reachable site had it: the page
-  shows it as **AI generated**. Don't add a source you couldn't fetch.
-  Ingredients follow the source; the method is summarised in our own words.
-- **Metric only**, except tsp/tbsp: `unit` is one of `UNITS`, and
-  `data.test.ts` fails on cups, oz, lb, inches, sticks or °F anywhere in the
-  text. US cups → 240 ml, Australian cups → 250 ml, dry cups → grams per
-  ingredient.
+- **A pairing index only.** `flavours.json` holds the names of rubs,
+  marinades and sauces and what they go with: `id`, `name`, `kind`,
+  `cuisine`, `region`, `pairsWith`, `cooking`, `heat`. No ingredients,
+  methods, tips or links to recipe sites (copyright: Seb looks the recipes
+  up himself). Don't add them back; `data.test.ts` fails on any other key
+  or a URL.
+- Entries are validated by `FlavourSchema` in `data.ts`. `pairsWith` uses
+  the fixed `TAGS` (proteins + sides; `steak` and `salmon` are narrower tags
+  that sit on top of `beef` and `fish`).
 - `engine.ts` `suggest({ text, kind, region }, FLAVOURS)` is pure. Free text →
   tags via `SYNONYMS` (two-word phrases first). Cut words (`CUTS`: fillet,
   chop, thigh…) only count when no protein is named, so "salmon fillet"
