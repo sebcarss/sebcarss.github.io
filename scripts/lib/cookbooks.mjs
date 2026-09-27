@@ -218,6 +218,17 @@ export function promoteRecipes(book) {
 }
 
 /**
+ * Index lines in `after` that are new or gained pages compared with `before`:
+ * what an import added, counted on the final book.
+ * @param {Book} before
+ * @param {Book} after
+ */
+export function changedIndexLines(before, after) {
+  const was = new Map((before.index ?? []).map((e) => [indexKey(e), e.pages.length]));
+  return (after.index ?? []).filter((e) => (was.get(indexKey(e)) ?? 0) < uniquePages(e.pages).length).length;
+}
+
+/**
  * Add an imported book's recipes and index to an existing one. Recipes
  * already there (same title ignoring case/punctuation, same page) and index
  * lines already there (same term + sub) aren't duplicated; an index line's

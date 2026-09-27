@@ -12,7 +12,7 @@
 import { createInterface } from "node:readline/promises";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { checkBook, cleanBook, mergeBook, parseImport, promoteRecipes, serializeBook, slugForNewBook, validateBook } from "./lib/cookbooks.mjs";
+import { changedIndexLines, checkBook, cleanBook, mergeBook, parseImport, promoteRecipes, serializeBook, slugForNewBook, validateBook } from "./lib/cookbooks.mjs";
 import { BOOKS_DIR, commitAndPush, dim, green, loadBooks, root, startOnMaster, yellow } from "./lib/cli.mjs";
 
 const args = process.argv.slice(2);
@@ -87,6 +87,8 @@ async function main() {
   // Dish names left in the index (cross-listed under their ingredients) become recipes.
   const { book, promoted } = promoteRecipes(merged.book);
   merged.recipes += promoted;
+  // Counted on the final book: lines promoted to recipes aren't index lines.
+  merged.index = changedIndexLines(target.data, book);
   const rel = relative(root, target.file);
 
   console.log(`${existing ? "Updating" : "New book"} ${green(book.book)} ${dim(rel)}`);

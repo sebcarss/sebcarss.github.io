@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BookSchema } from "../../src/tools/cookbooks/data";
 import {
-  actionsUrl, addRecipe, checkBook, cleanBook, isDuplicate, mergeBook, parseEntryLine, parseImport, parsePage, promoteRecipes, removeRecipe, serializeBook,
+  actionsUrl, addRecipe, changedIndexLines, checkBook, cleanBook, isDuplicate, mergeBook, parseEntryLine, parseImport, parsePage, promoteRecipes, removeRecipe, serializeBook,
   slugForNewBook, slugify, sortRecipes, validateBook,
 } from "./cookbooks.mjs";
 
@@ -188,6 +188,21 @@ describe("book indexes and imports", () => {
     expect(b.recipes).toEqual([{ title: "American hot pizza pie", page: 160 }]);
     expect(b.index!.filter((e) => !e.sub)).toEqual([{ term: "pork", pages: [154] }, { term: "smoothies", pages: [26] }]);
     expect(promoteRecipes(b).promoted).toBe(0);
+  });
+
+  it("counts the index lines an import added on the final book", () => {
+    const before = { book: "B", recipes: [], index: [{ term: "pork", pages: [154] }, { term: "cheese", sub: "fondue", pages: [12] }] };
+    const after = {
+      book: "B",
+      recipes: [{ title: "American hot pizza pie", page: 160 }],
+      index: [
+        { term: "pork", pages: [154, 160] }, // gained a page
+        { term: "cheese", sub: "fondue", pages: [12] }, // unchanged
+        { term: "cheese", sub: "American hot pizza pie", pages: [160] }, // new
+      ],
+    };
+    expect(changedIndexLines(before, after)).toBe(2);
+    expect(changedIndexLines(after, after)).toBe(0);
   });
 
   it("leaves glossary pages alone", () => {
