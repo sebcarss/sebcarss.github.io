@@ -8,9 +8,6 @@ export interface Match extends Entry {
   via?: string;
 }
 
-// An index hit ranks just below a title hit of the same strength.
-const INDEX_PENALTY = 50;
-
 // Words that say nothing about the dish; ignored when matching words, so
 // "chicken with rice" doesn't hit every "… with …" recipe.
 const STOPWORDS = new Set(["a", "an", "and", "the", "of", "with", "in", "on", "for", "style", "my", "to"]);
@@ -92,27 +89,34 @@ function scoreText(q: Query, title: string): { score: number; kind: MatchKind } 
   return { score: 400 * avg, kind: "partial" };
 }
 
+export interface SearchResults {
+  /** Recipes whose title matches, best first. */
+  recipes: Match[];
+  /** Pages the books' indexes list under a matching heading, e.g. every "Pork › …" dish for "pork". */
+  index: Match[];
+}
+
+const byScore = (a: Match, b: Match) => b.score - a.score || a.title.localeCompare(b.title) || a.book.localeCompare(b.book) || a.page - b.page;
+const matchKey = (m: { book: string; page: number; title: string }) => `${m.book}|${m.page}|${m.title}`;
+
 /**
- * Every recipe whose title matches the query, best first: exact titles,
- * then titles containing the phrase or every word, then titles sharing some
- * words ("Chicken Pasta" for "pasta bake"). With `index`, lines of the books'
- * indexes match too ("salo" finds "Ukrainian 'narcotics'" via "Salo 136"); a
- * recipe found both ways appears once, as its better match.
+ * Recipes whose title matches the query, best first: exact titles, then
+ * titles containing the phrase or every word, then titles sharing some words
+ * ("Chicken Pasta" for "pasta bake"). With `index`, the books' index lines
+ * whose heading matches every query word ("salo" finds "Ukrainian
+ * 'narcotics'" via "Salo 136") are listed separately, for ideas by
+ * ingredient, leaving out recipes already found by title.
  */
-export function search(query: string, entries: readonly Entry[], opts: { book?: string; index?: readonly IndexRow[] } = {}): Match[] {
+export function search(query: string, entries: readonly Entry[], opts: { book?: string; index?: readonly IndexRow[] } = {}): SearchResults {
   const q = prepare(query);
-  if (!q) return [];
-  const best = new Map<string, Match>();
-  const add = (m: Match) => {
-    const key = `${m.book}|${m.page}|${m.title}`;
-    const prev = best.get(key);
-    if (!prev || m.score > prev.score) best.set(key, m);
-  };
+  if (!q) return { recipes: [], index: [] };
+  const recipes = new Map<string, Match>();
   for (const e of entries) {
     if (opts.book && e.book !== opts.book) continue;
     const s = scoreText(q, e.title);
-    if (s) add({ ...e, ...s });
+    if (s) recipes.set(matchKey(e), { ...e, ...s });
   }
+  const index = new Map<string, Match>();
   for (const r of opts.index ?? []) {
     if (opts.book && r.book !== opts.book) continue;
     let s: { score: number; kind: MatchKind } | null = null;
@@ -120,22 +124,25 @@ export function search(query: string, entries: readonly Entry[], opts: { book?: 
       const x = scoreText(q, t);
       if (x && (!s || x.score > s.score)) s = x;
     }
-    if (!s) continue;
-    // "Exact" is kept for titles; the recipe's name may look nothing like the query.
-    add({ title: r.title ?? r.label, book: r.book, page: r.page, score: s.score - INDEX_PENALTY, kind: s.kind === "exact" ? "strong" : s.kind, via: r.label });
+    // Only headings that match every word: "beef rendang" shouldn't list every "beef › …" dish.
+    if (!s || s.kind === "partial") continue;
+    const m: Match = { title: r.title, book: r.book, page: r.page, score: s.score, kind: "strong", via: r.label };
+    const key = matchKey(m);
+    if (recipes.has(key)) continue;
+    const prev = index.get(key);
+    if (!prev || m.score > prev.score) index.set(key, m);
   }
-  return [...best.values()].sort((a, b) => b.score - a.score || a.title.localeCompare(b.title) || a.book.localeCompare(b.book) || a.page - b.page);
+  return { recipes: [...recipes.values()].sort(byScore), index: [...index.values()].sort(byScore) };
 }
 
 export interface IndexGroup {
   term: string;
   pages: number[];
-  see?: string;
-  subs: { sub: string; pages: number[]; see?: string }[];
+  subs: { sub: string; pages: number[] }[];
 }
 
 const byText = (a: string, b: string) => normalize(a).localeCompare(normalize(b)) || a.localeCompare(b);
-const mergePages = (a: number[], b: number[] = []) => [...new Set([...a, ...b])].sort((x, y) => x - y);
+const mergePages = (a: number[], b: number[]) => [...new Set([...a, ...b])].sort((x, y) => x - y);
 
 /** A book's index laid out like the printed one: headings A–Z, each with its pages and sub-entries. */
 export function bookIndex(index: readonly IndexEntry[]): IndexGroup[] {
@@ -146,14 +153,11 @@ export function bookIndex(index: readonly IndexEntry[]): IndexGroup[] {
     if (!g) groups.set(key, (g = { term: e.term, pages: [], subs: [] }));
     if (!e.sub) {
       g.pages = mergePages(g.pages, e.pages);
-      g.see ??= e.see;
       continue;
     }
     const sub = g.subs.find((s) => normalize(s.sub) === normalize(e.sub!));
-    if (sub) {
-      sub.pages = mergePages(sub.pages, e.pages);
-      sub.see ??= e.see;
-    } else g.subs.push({ sub: e.sub, pages: mergePages([], e.pages), ...(e.see ? { see: e.see } : {}) });
+    if (sub) sub.pages = mergePages(sub.pages, e.pages);
+    else g.subs.push({ sub: e.sub, pages: mergePages([], e.pages) });
   }
   for (const g of groups.values()) g.subs.sort((a, b) => byText(a.sub, b.sub));
   return [...groups.values()].sort((a, b) => byText(a.term, b.term));

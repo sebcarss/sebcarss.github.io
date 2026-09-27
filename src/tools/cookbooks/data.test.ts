@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { BOOK_FILES, BookSchema, parseBooks, toEntries } from "./data";
-import { resolveSee, titleKey } from "../../../scripts/lib/cookbooks.mjs";
+import { titleKey } from "../../../scripts/lib/cookbooks.mjs";
 
 // Guards the deploy: CI runs these, so a bad hand-edit never reaches the site.
 describe("book files", () => {
@@ -17,12 +17,14 @@ describe("book files", () => {
     expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
   });
 
-  it.each(files)("%s index: no repeated line, and every see finds a heading", (_path, json) => {
-    const index = BookSchema.parse(json).index ?? [];
+  it.each(files)("%s index: no repeated line, and no heading that is just a recipe on that page", (_path, json) => {
+    const book = BookSchema.parse(json);
+    const index = book.index ?? [];
     const keys = index.map((e) => `${titleKey(e.term)}|${titleKey(e.sub ?? "")}`);
     expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
-    const terms = index.map((e) => e.term);
-    expect(index.filter((e) => e.see && !resolveSee(e.see, terms).length).map((e) => `${e.term} → ${e.see}`)).toEqual([]);
+    // Dish names belong in "recipes"; left in the index too they'd show twice.
+    const recipes = new Set(book.recipes.map((r) => `${titleKey(r.title)}|${r.page}`));
+    expect(index.filter((e) => !e.sub && e.pages.some((p) => recipes.has(`${titleKey(e.term)}|${p}`))).map((e) => e.term)).toEqual([]);
   });
 
   it("book names are unique", () => {
@@ -44,10 +46,12 @@ describe("parseBooks", () => {
     warn.mockRestore();
   });
 
-  it("accepts an index and rejects a line with neither pages nor see", () => {
-    const ok = { book: "B", recipes: [], index: [{ term: "Salo", pages: [3] }, { term: "Pork belly", see: "Salo" }] };
+  it("accepts an index and rejects a line without pages", () => {
+    const ok = { book: "B", recipes: [], index: [{ term: "Salo", pages: [3] }, { term: "Pork", sub: "salo", pages: [3] }] };
     expect(BookSchema.safeParse(ok).success).toBe(true);
     expect(BookSchema.safeParse({ ...ok, index: [{ term: "Salo" }] }).success).toBe(false);
+    expect(BookSchema.safeParse({ ...ok, index: [{ term: "Pork belly", see: "Salo" }] }).success).toBe(false);
+    expect(BookSchema.safeParse({ ...ok, index: [{ term: "Salo", pages: [] }] }).success).toBe(false);
     expect(BookSchema.safeParse({ ...ok, index: [{ term: "Salo", pages: [0] }] }).success).toBe(false);
   });
 });

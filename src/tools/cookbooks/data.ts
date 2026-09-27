@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { resolveSee, titleKey } from "../../../scripts/lib/cookbooks.mjs";
+import { subDish, titleKey } from "../../../scripts/lib/cookbooks.mjs";
 
 // One JSON file per book in ./books, written by `npm run add-recipes`,
 // `npm run import-book` (scripts/) or by hand.
@@ -7,16 +7,14 @@ export const RecipeSchema = z.object({
   title: z.string().trim().min(1),
   page: z.number().int().positive(),
 });
-// One line of the book's printed index: "Salo 80, 117, 136", the indented
-// "Pork › salo 136" (term + sub) or "Pork belly, see Salo".
-export const IndexEntrySchema = z
-  .object({
-    term: z.string().trim().min(1),
-    sub: z.string().trim().min(1).optional(),
-    pages: z.array(z.number().int().positive()).optional(),
-    see: z.string().trim().min(1).optional(),
-  })
-  .refine((e) => (e.pages?.length ?? 0) > 0 || e.see, { message: "an index entry needs pages or see" });
+// One line of the book's printed index: "Salo 80, 117, 136" or the indented
+// "Pork › salo 136" (term + sub). Dish names live in `recipes`, and "see"
+// cross-references aren't kept.
+export const IndexEntrySchema = z.object({
+  term: z.string().trim().min(1),
+  sub: z.string().trim().min(1).optional(),
+  pages: z.array(z.number().int().positive()).min(1),
+});
 export const BookSchema = z.object({
   book: z.string().trim().min(1),
   recipes: z.array(RecipeSchema),
@@ -37,12 +35,12 @@ export interface Entry {
 export interface IndexRow {
   book: string;
   page: number;
-  /** As printed: "Salo", "Pork › salo", "Pork belly → Salo". */
+  /** As printed: "Salo", "Pork › salo". */
   label: string;
   /** Texts the query is matched against: "term sub" and "sub". */
   texts: string[];
-  /** The recipe the page falls in, or null (an intro page, say). */
-  title: string | null;
+  /** The dish the line points at (see toIndexRows). */
+  title: string;
 }
 
 // Parse leniently: a malformed file is skipped with a warning rather than
@@ -59,35 +57,28 @@ export function parseBooks(files: Record<string, unknown>): Book[] {
 export const toEntries = (books: Book[]): Entry[] =>
   books.flatMap((b) => b.recipes.map((r) => ({ title: r.title, book: b.book, page: r.page })));
 
-/** How far past a recipe's first page an index page still counts as that recipe. */
-export const RECIPE_SPAN = 5;
-
-/** The recipe a page falls in: the last one starting on or before it, within RECIPE_SPAN pages. */
-export function recipeAt(recipes: readonly Recipe[], page: number): Recipe | null {
-  let best: Recipe | null = null;
-  for (const r of recipes) if (r.page <= page && (!best || r.page > best.page)) best = r;
-  return best && page - best.page <= RECIPE_SPAN ? best : null;
-}
-
 /**
- * Every page reference in every book's index; "see" entries take their
- * targets' pages (resolveSee, shared with the import script, reads lists).
+ * Every page reference in every book's index, titled by the dish it points
+ * at: the recipe its sub-entry names ("Pork › shoulder: American hot pizza
+ * pie" 160), else the recipe starting on that page, else the dish the
+ * sub-entry names ("Pork › shoulder: dim sum pork buns"), else the heading
+ * itself ("Pork" 154, a page about pork).
  */
 export function toIndexRows(books: Book[]): IndexRow[] {
   return books.flatMap((b) => {
-    const index = b.index ?? [];
-    const terms = index.map((e) => e.term);
-    const ownPages = (term: string) => {
-      const same = index.filter((e) => titleKey(e.term) === titleKey(term));
-      const own = same.filter((e) => !e.sub).flatMap((e) => e.pages ?? []);
-      return own.length ? own : same.flatMap((e) => e.pages ?? []);
-    };
-    return index.flatMap((e) => {
-      const heading = e.sub ? `${e.term} › ${e.sub}` : e.term;
+    const named = new Map(b.recipes.map((r) => [`${titleKey(r.title)}|${r.page}`, r.title]));
+    const starts = new Map(b.recipes.map((r) => [r.page, r.title]));
+    return (b.index ?? []).flatMap((e) => {
+      const label = e.sub ? `${e.term} › ${e.sub}` : e.term;
       const texts = e.sub ? [`${e.term} ${e.sub}`, e.sub] : [e.term];
-      const pages = e.pages?.length ? e.pages : resolveSee(e.see!, terms).flatMap(ownPages);
-      const label = e.pages?.length || !e.see ? heading : `${heading} → ${e.see}`;
-      return [...new Set(pages)].map((page) => ({ book: b.book, page, label, texts, title: recipeAt(b.recipes, page)?.title ?? null }));
+      const dish = e.sub && subDish(e.sub);
+      return [...new Set(e.pages)].map((page) => ({
+        book: b.book,
+        page,
+        label,
+        texts,
+        title: (dish && (named.get(`${titleKey(e.sub!)}|${page}`) ?? named.get(`${titleKey(dish)}|${page}`))) || starts.get(page) || dish || e.term,
+      }));
     });
   });
 }

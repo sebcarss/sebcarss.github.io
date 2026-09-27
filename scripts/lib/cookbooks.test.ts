@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BookSchema } from "../../src/tools/cookbooks/data";
 import {
-  actionsUrl, addRecipe, checkBook, cleanBook, isDuplicate, mergeBook, parseEntryLine, parseImport, parsePage, removeRecipe, resolveSee, serializeBook,
+  actionsUrl, addRecipe, checkBook, cleanBook, isDuplicate, mergeBook, parseEntryLine, parseImport, parsePage, promoteRecipes, removeRecipe, serializeBook,
   slugForNewBook, slugify, sortRecipes, validateBook,
 } from "./cookbooks.mjs";
 
@@ -112,7 +112,7 @@ describe("book indexes and imports", () => {
     index: [
       { term: "Salo", pages: [80, 136] },
       { term: "Pork", sub: "salo", pages: [136] },
-      { term: "Pork belly", see: "Salo" },
+      { term: "Pork belly", pages: [136] },
     ],
   };
 
@@ -125,7 +125,7 @@ describe("book indexes and imports", () => {
   ],
   "index": [
     { "term": "Pork", "sub": "salo", "pages": [136] },
-    { "term": "Pork belly", "see": "Salo" },
+    { "term": "Pork belly", "pages": [136] },
     { "term": "Salo", "pages": [80, 136] }
   ]
 }
@@ -142,16 +142,57 @@ describe("book indexes and imports", () => {
   it("validates index lines", () => {
     expect(validateBook(book)).toEqual([]);
     expect(validateBook({ ...book, index: "x" })).toEqual(['"index" must be an array']);
-    expect(validateBook({ ...book, index: [{ term: "Salo" }] })).toEqual(['index entry 1 (Salo): needs pages or "see"']);
+    // A see-only line is fine here; cleanBook drops it.
+    expect(validateBook({ ...book, index: [{ term: "Pork belly", see: "Salo" }] })).toEqual([]);
     expect(validateBook({ ...book, index: [{ term: "", pages: [1.5] }] })).toHaveLength(2);
   });
 
   it("tidies an import: spaces, page order and duplicates", () => {
-    expect(cleanBook({ book: " Mamushka ", recipes: [{ title: "Beef  stew ", page: 4 }], index: [{ term: "Salo ", pages: [136, 80, 136] }, { term: "X", pages: [], see: "Salo" }] })).toEqual({
+    expect(cleanBook({ book: " Mamushka ", recipes: [{ title: "Beef  stew ", page: 4 }], index: [{ term: "Salo ", pages: [136, 80, 136] }] })).toEqual({
       book: "Mamushka",
       recipes: [{ title: "Beef stew", page: 4 }],
-      index: [{ term: "Salo", pages: [80, 136] }, { term: "X", see: "Salo" }],
+      index: [{ term: "Salo", pages: [80, 136] }],
     });
+  });
+
+  it("drops see references and splits a heading printed with its one dish", () => {
+    const index = [
+      { term: "bread", see: "bruschetta; croutons; pizza" },
+      { term: "pork", pages: [154], see: "bacon; ham" },
+      { term: "pizza: American hot pizza pie", pages: [160] },
+      { term: "pork", sub: "shoulder: American hot pizza pie", pages: [160] },
+    ];
+    expect(cleanBook({ book: "Save with Jamie", recipes: [], index }).index).toEqual([
+      { term: "pork", pages: [154] },
+      { term: "pizza", sub: "American hot pizza pie", pages: [160] },
+      { term: "pork", sub: "shoulder: American hot pizza pie", pages: [160] },
+    ]);
+    expect(cleanBook({ book: "B", recipes: [], index: [index[0]!] })).not.toHaveProperty("index");
+  });
+
+  it("moves dish names cross-listed under their ingredients into recipes", () => {
+    const { book: b, promoted } = promoteRecipes({
+      book: "Save with Jamie",
+      recipes: [],
+      index: [
+        { term: "American hot pizza pie", pages: [160] },
+        { term: "cheese", sub: "American hot pizza pie", pages: [160] },
+        { term: "pork", sub: "shoulder: American hot pizza pie", pages: [160] },
+        { term: "pork", pages: [154] },
+        { term: "smoothies", pages: [26] }, // a category: it has sub-entries
+        { term: "smoothies", sub: "peach Melba", pages: [28] },
+        { term: "yoghurt", sub: "smoothies", pages: [26] },
+      ],
+    });
+    expect(promoted).toBe(1);
+    expect(b.recipes).toEqual([{ title: "American hot pizza pie", page: 160 }]);
+    expect(b.index!.filter((e) => !e.sub)).toEqual([{ term: "pork", pages: [154] }, { term: "smoothies", pages: [26] }]);
+    expect(promoteRecipes(b).promoted).toBe(0);
+  });
+
+  it("leaves glossary pages alone", () => {
+    const glossary = ["Mirin", "Miso", "Konbu"].flatMap((t) => [{ term: t, pages: [14] }, { term: "Ingredients", sub: t, pages: [14] }]);
+    expect(promoteRecipes({ book: "W", recipes: [], index: glossary }).promoted).toBe(0);
   });
 
   it("merges an import without duplicating, unioning an index line's pages", () => {
@@ -170,21 +211,10 @@ describe("book indexes and imports", () => {
     expect(mergeBook({ book: "New", recipes: [] }, { book: "New", recipes: [] }).book).not.toHaveProperty("index");
   });
 
-  it("resolves see lists and headings named by their start", () => {
-    const terms = ["butter beans, pot-roast pheasant with", "white beans", "blue cheese", "goat's cheese", "dried fruit", "apples", "stews and casseroles", "smoked haddock, scrambled eggs with"];
-    expect(resolveSee("butter beans, white beans etc", terms)).toEqual(["butter beans, pot-roast pheasant with", "white beans"]);
-    expect(resolveSee("blue cheese; goat's cheese", terms)).toEqual(["blue cheese", "goat's cheese"]);
-    expect(resolveSee("dried fruit and apples, strawberries etc", terms)).toEqual(["dried fruit", "apples"]);
-    expect(resolveSee("stews and casseroles", terms)).toEqual(["stews and casseroles"]);
-    expect(resolveSee("smoked haddock", terms)).toEqual(["smoked haddock, scrambled eggs with"]);
-    expect(resolveSee("basil", terms)).toEqual([]);
-  });
-
   it("flags likely misreadings", () => {
-    const warnings = checkBook({ ...book, index: [...book.index, { term: "Beef [?]", pages: [960] }, { term: "Lamb", see: "Mutton" }] });
-    expect(warnings).toHaveLength(3);
+    const warnings = checkBook({ ...book, index: [...book.index, { term: "Beef [?]", pages: [960] }] });
+    expect(warnings).toHaveLength(2);
     expect(warnings.join("\n")).toMatch(/p\. 960 is after the last recipe/);
-    expect(warnings.join("\n")).toMatch(/"Mutton", which matches no heading/);
     expect(warnings.join("\n")).toMatch(/unreadable/);
     expect(checkBook(book)).toEqual([]);
   });

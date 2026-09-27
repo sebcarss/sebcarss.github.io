@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bookIndex, bookRecipes, bookSummaries, levenshtein, normalize, search, searchBooks, singular, stats } from "./engine";
-import { RECIPE_SPAN, recipeAt, toEntries, toIndexRows, type Book, type Entry } from "./data";
+import { bookIndex, bookRecipes, bookSummaries, levenshtein, normalize, search, searchBooks, singular, stats, type Match } from "./engine";
+import { toEntries, toIndexRows, type Book, type Entry } from "./data";
 
 const E = (title: string, book = "Book A", page = 1): Entry => ({ title, book, page });
 const ENTRIES: Entry[] = [
@@ -17,7 +17,7 @@ const ENTRIES: Entry[] = [
   E("Mac & Cheese", "Book A", 70),
   E("Tomato Soup", "Book C", 5),
 ];
-const titles = (q: string, opts?: { book?: string }) => search(q, ENTRIES, opts).map((m) => m.title);
+const titles = (q: string, opts?: { book?: string }) => search(q, ENTRIES, opts).recipes.map((m) => m.title);
 
 describe("normalising", () => {
   it("ignores case, accents, punctuation and ampersands", () => {
@@ -41,13 +41,13 @@ describe("normalising", () => {
 
 describe("search", () => {
   it("ranks an exact title first and marks it exact", () => {
-    const r = search("Moussaka", ENTRIES);
+    const r = search("Moussaka", ENTRIES).recipes;
     expect(r[0]).toMatchObject({ title: "Moussaka", book: "Book C", page: 12, kind: "exact" });
     expect(r[1]).toMatchObject({ title: "Vegetarian Moussaka", kind: "strong" });
   });
 
   it("pasta bake: exact, then containing, then every word, then partial", () => {
-    const r = search("pasta bake", ENTRIES);
+    const r = search("pasta bake", ENTRIES).recipes;
     expect(r.map((m) => m.title)).toEqual(["Pasta Bake", "Easy Pasta Bake", "Baked Pasta with Ricotta", "Chicken Pasta"]);
     expect(r.map((m) => m.kind)).toEqual(["exact", "strong", "strong", "partial"]);
     expect(r[0]!.score).toBeGreaterThan(r[1]!.score);
@@ -55,13 +55,13 @@ describe("search", () => {
   });
 
   it("is case, accent and punctuation insensitive", () => {
-    expect(search("GRATIN dauphinois!", ENTRIES)[0]).toMatchObject({ title: "Gratin Dauphinois", kind: "exact" });
-    expect(search("mac and cheese", ENTRIES)[0]).toMatchObject({ title: "Mac & Cheese", kind: "exact" });
+    expect(search("GRATIN dauphinois!", ENTRIES).recipes[0]).toMatchObject({ title: "Gratin Dauphinois", kind: "exact" });
+    expect(search("mac and cheese", ENTRIES).recipes[0]).toMatchObject({ title: "Mac & Cheese", kind: "exact" });
   });
 
   it("tolerates plurals and typos", () => {
-    expect(search("pasta bakes", ENTRIES)[0]).toMatchObject({ title: "Pasta Bake", kind: "exact" });
-    expect(search("tomato soups", ENTRIES)[0]).toMatchObject({ title: "Tomato Soup", kind: "exact" });
+    expect(search("pasta bakes", ENTRIES).recipes[0]).toMatchObject({ title: "Pasta Bake", kind: "exact" });
+    expect(search("tomato soups", ENTRIES).recipes[0]).toMatchObject({ title: "Tomato Soup", kind: "exact" });
     expect(titles("mousaka")).toEqual(["Moussaka", "Vegetarian Moussaka"]);
     expect(titles("lasagna")).toEqual(["Lasagne"]);
     expect(titles("gratin dauphinoise")[0]).toBe("Gratin Dauphinois");
@@ -81,9 +81,9 @@ describe("search", () => {
   });
 
   it("returns nothing for empty or unmatched queries", () => {
-    expect(search("", ENTRIES)).toEqual([]);
-    expect(search("  !! ", ENTRIES)).toEqual([]);
-    expect(search("sushi", ENTRIES)).toEqual([]);
+    expect(search("", ENTRIES).recipes).toEqual([]);
+    expect(search("  !! ", ENTRIES).recipes).toEqual([]);
+    expect(search("sushi", ENTRIES).recipes).toEqual([]);
   });
 
   it("short words don't fuzzy-match unrelated titles", () => {
@@ -143,12 +143,16 @@ describe("book indexes", () => {
       { title: "Ukrainian 'narcotics'", page: 136 },
       { title: "Garlicky white rabbit", page: 139 },
       { title: "Borscht", page: 78 },
+      { title: "American hot pizza pie", page: 160 },
     ],
     index: [
       { term: "Salo", pages: [80, 136] },
       { term: "Pork", sub: "salo", pages: [136] },
       { term: "Pork", sub: "roast loin", pages: [135] },
-      { term: "Pork belly", see: "Salo" },
+      { term: "Pork", sub: "shoulder: American hot pizza pie", pages: [160] },
+      { term: "Cheese", sub: "American hot pizza pie", pages: [160] },
+      { term: "Pizza", sub: "American hot pizza pie", pages: [160] },
+      { term: "Pork", sub: "buns: dim sum pork buns", pages: [164] },
       { term: "Rabbit", pages: [139] },
       { term: "Preserving", pages: [5] },
     ],
@@ -156,50 +160,51 @@ describe("book indexes", () => {
   const entries = toEntries([book]);
   const rows = toIndexRows([book]);
   const find = (q: string) => search(q, entries, { index: rows });
+  const show = (ms: Match[]) => ms.map((m) => `${m.title} p. ${m.page}`);
 
-  it("joins an index page to the recipe it falls in, within a few pages", () => {
-    expect(recipeAt(book.recipes, 136)?.title).toBe("Ukrainian 'narcotics'");
-    expect(recipeAt(book.recipes, 138)?.title).toBe("Ukrainian 'narcotics'");
-    expect(recipeAt(book.recipes, 80)?.title).toBe("Borscht");
-    expect(recipeAt(book.recipes, 5)).toBeNull(); // before the first recipe
-    expect(recipeAt(book.recipes, 139 + RECIPE_SPAN + 1)).toBeNull(); // too far past the last
+  it("titles an index line by the dish it points at", () => {
+    const title = (label: string, page: number) => rows.find((r) => r.label === label && r.page === page)?.title;
+    expect(title("Pork › shoulder: American hot pizza pie", 160)).toBe("American hot pizza pie"); // the recipe its sub names
+    expect(title("Salo", 136)).toBe("Ukrainian 'narcotics'"); // the recipe starting on that page
+    expect(title("Pork › buns: dim sum pork buns", 164)).toBe("dim sum pork buns"); // not a recipe, and not the one on p. 160
+    expect(title("Salo", 80)).toBe("Salo"); // a page about salo
   });
 
-  it("finds a recipe by an index term its title doesn't mention", () => {
+  it("finds a recipe by an index term its title doesn't mention, as an ingredient match", () => {
     const r = find("salo");
-    expect(r.map((m) => `${m.title} p. ${m.page}`)).toEqual(["Borscht p. 80", "Ukrainian 'narcotics' p. 136"]);
-    expect(r[1]).toMatchObject({ kind: "strong", via: "Salo" });
+    expect(r.recipes).toEqual([]);
+    expect(show(r.index)).toEqual(["Salo p. 80", "Ukrainian 'narcotics' p. 136"]);
+    expect(r.index[1]).toMatchObject({ kind: "strong", via: "Salo" });
   });
 
-  it("follows see references", () => {
-    const strong = find("pork belly").filter((m) => m.kind !== "partial");
-    expect(strong.map((m) => [m.title, m.page, m.via])).toEqual([
-      ["Borscht", 80, "Pork belly → Salo"],
-      ["Ukrainian 'narcotics'", 136, "Pork belly → Salo"],
-    ]);
+  it("keeps recipes and ingredient matches apart, listing a recipe once", () => {
+    const pizza = find("pizza");
+    expect(show(pizza.recipes)).toEqual(["American hot pizza pie p. 160"]);
+    expect(pizza.index).toEqual([]); // "Pizza › American hot pizza pie" is the same recipe
+    const pork = find("pork");
+    expect(show(pork.recipes)).toEqual(["Aromatic roast pork loin p. 135"]);
+    expect(show(pork.index)).toEqual(["Ukrainian 'narcotics' p. 136", "dim sum pork buns p. 164", "American hot pizza pie p. 160"]); // closer lines first
+    expect(find("cheese").index.map((m) => m.via)).toEqual(["Cheese › American hot pizza pie"]);
   });
 
-  it("lists one recipe once when title and index both match, and ranks titles above index-only hits", () => {
-    const r = find("pork");
-    // "Pork belly → Salo" sends p. 80 (Borscht) too, as the printed index would.
-    expect(r.map((m) => m.title)).toEqual(["Aromatic roast pork loin", "Borscht", "Ukrainian 'narcotics'"]);
-    expect(r[0]!.via).toBeUndefined(); // the title match beat the index line
-    expect(find("rabbit").filter((m) => m.title === "Garlicky white rabbit")).toHaveLength(1);
+  it("only lists index lines that match every word", () => {
+    // "pork" alone matches Pork › … lines, but they aren't "roast pork shoulder" dishes.
+    expect(find("pork shoulder").index.map((m) => m.title)).toEqual(["American hot pizza pie"]);
+    expect(find("pork belly").index).toEqual([]);
   });
 
   it("names a page with no recipe after its index line", () => {
-    expect(find("preserving")).toEqual([expect.objectContaining({ title: "Preserving", page: 5, via: "Preserving" })]);
+    expect(find("preserving").index).toEqual([expect.objectContaining({ title: "Preserving", page: 5, via: "Preserving" })]);
   });
 
   it("filters index hits by book too", () => {
-    expect(search("salo", entries, { index: rows, book: "Other" })).toEqual([]);
+    expect(search("salo", entries, { index: rows, book: "Other" })).toEqual({ recipes: [], index: [] });
   });
 
   it("groups a book's index like the printed one", () => {
     const groups = bookIndex([...book.index!, { term: "salo", pages: [117, 80] }]);
-    expect(groups.map((g) => g.term)).toEqual(["Pork", "Pork belly", "Preserving", "Rabbit", "Salo"]);
-    expect(groups[0]).toMatchObject({ pages: [], subs: [{ sub: "roast loin", pages: [135] }, { sub: "salo", pages: [136] }] });
-    expect(groups[1]).toMatchObject({ pages: [], see: "Salo" });
-    expect(groups[4]!.pages).toEqual([80, 117, 136]);
+    expect(groups.map((g) => g.term)).toEqual(["Cheese", "Pizza", "Pork", "Preserving", "Rabbit", "Salo"]);
+    expect(groups[2]).toMatchObject({ pages: [], subs: [{ sub: "buns: dim sum pork buns", pages: [164] }, { sub: "roast loin", pages: [135] }, { sub: "salo", pages: [136] }, { sub: "shoulder: American hot pizza pie", pages: [160] }] });
+    expect(groups[5]!.pages).toEqual([80, 117, 136]);
   });
 });

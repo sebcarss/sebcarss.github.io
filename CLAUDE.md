@@ -115,39 +115,64 @@ rank its own style first for all 22 — that invariant is a test.
 
 A search page rather than a calculator: no `compute`, `state.ts`, `useDraft`
 or `RecipeBar`. Data is one JSON file per book in `books/`
-(`{ book, recipes: [{ title, page }], index?: [{ term, sub?, pages?, see? }] }`),
-loaded with `import.meta.glob` in `data.ts`. `index` is the book's printed
-index transcribed flat: a sub-entry repeats its heading as `term`, ranges keep
-their first page, and each line needs `pages` or `see`. They're bundled into
-the JS, so they work offline. Files are validated leniently with zod (`parseBooks` skips a bad book with a warning),
-and `data.test.ts` fails CI on any invalid file, duplicate title+page,
-duplicate index term+sub, a `see` that matches no heading, or duplicate book
-name. `resolveSee` (scripts/lib/cookbooks.mjs, also used by `data.ts`) reads
-printed see-lists ("butter beans, white beans etc", "a; b", "x and y") and
-matches a heading exactly or by its start ("smoked haddock" → "smoked
-haddock, scrambled eggs with"). `example-cookbook.json` is only a placeholder; the render test
-mocks `data.ts`, so deleting it is safe.
+(`{ book, recipes: [{ title, page }], index?: [{ term, sub?, pages }] }`),
+loaded with `import.meta.glob` in `data.ts`.
+- `recipes` holds the dishes: from the contents pages, or from the index
+  lines that name a dish.
+- `index` is the rest of the book's printed index (ingredients, dish types,
+  topics), transcribed flat:
+  - a sub-entry repeats its heading as `term`;
+  - "heading: dish" on one line is split into term + sub;
+  - ranges keep their first page;
+  - every line needs `pages`.
+- There is no `see`: cross-references are dropped, because they only
+  duplicated results.
 
-`engine.ts` `search(query, entries, { book, index })` is pure. Titles and query are
-normalised (accents, case, `&`→and, punctuation) and lightly singularised,
-then scored: exact title 1000 → title contains the query phrase 700–800 →
-every non-stopword query word matches 550–650 (all "strong") → some match,
-`400 × avg word score` ("partial", shown under "Also mentions…"). A word
-matches exactly (1), as a prefix of a title word of 3+ chars (0.9), or within
-Levenshtein 1 (5+ chars) / 2 (8+ chars) (0.8). `searchBooks` scores book
-names with the same `scoreText`; `bookSummaries(BOOKS)` gives recipe and
-index-line counts A–Z. It's built from the book files, not the recipes, so a
-book imported from its index alone is listed and opens (on its index, with no
-toggle). `bookRecipes` gives one book in page order.
+The books are bundled into the JS, so they work offline. Files are validated
+leniently with zod (`parseBooks` skips a bad book with a warning).
+`data.test.ts` fails CI on:
+- any invalid file;
+- a duplicate title+page;
+- a duplicate index term+sub;
+- a top-level index line that is just a recipe on that page;
+- a duplicate book name.
 
-Index search: `toIndexRows` (data.ts) expands each index line × page into
-an `IndexRow` joined to `recipeAt(recipes, page)`, which is the last recipe
-starting ≤ page, within `RECIPE_SPAN` (5) pages, or null. A see-only line takes
-its targets' pages (via `resolveSee`). `search(..., { index })` scores rows against
-"term sub" and "sub" with the same `scoreText`, 50 below a title hit and never
-"exact". Results merge by book|page|title, keeping the better score, so a
-recipe shows once. An index hit carries `via` ("Pork › salo"), which the page
-shows under the title. A page with no recipe is titled by its index label.
+`example-cookbook.json` is only a placeholder. The render test mocks
+`data.ts`, so deleting it is safe.
+
+`engine.ts` `search(query, entries, { book, index })` is pure and returns
+`{ recipes, index }`. Titles and query are normalised (accents, case,
+`&`→and, punctuation) and lightly singularised, then scored:
+- exact title: 1000;
+- title contains the query phrase: 700–800;
+- every non-stopword query word matches: 550–650 (all "strong");
+- some words match: `400 × avg word score` ("partial", shown under
+  "Close matches").
+
+A word matches:
+- exactly (1);
+- as a prefix of a title word of 3+ chars (0.9);
+- within Levenshtein 1 (5+ chars) or 2 (8+ chars) (0.8).
+
+`searchBooks` scores book names with the same `scoreText`.
+`bookSummaries(BOOKS)` gives recipe and index-line counts A–Z. It's built from
+the book files, not the recipes, so a book with only an index is listed and
+opens (on its index, with no toggle). `bookRecipes` gives one book in page
+order.
+
+Index search: `toIndexRows` (data.ts) expands each index line × page into an
+`IndexRow`, titled by the dish it points at:
+1. the recipe its sub-entry names (`subDish` strips a "shoulder: " prefix);
+2. else the recipe starting on that page;
+3. else the sub-entry's dish;
+4. else the heading ("pork" p. 154, a page about pork).
+
+There's no nearby-page join: in books whose recipes came from the index it
+mislabelled pages. `search` scores rows against "term sub" and "sub" and
+keeps only strong hits (every word), so "beef rendang" doesn't list every
+"beef › …" line. It drops rows whose book|page|title is already a recipe hit
+and dedupes the rest. That's the `index` group, shown under **By ingredient**
+below the recipe titles, each with its `via` ("Pork › salo").
 `bookIndex` groups a book's lines A–Z for the Index view.
 
 The page has three states driven by the URL:
@@ -169,11 +194,21 @@ ESM (the local Node is 20, so no TS).
 - `scripts/add-recipes.mjs`: type `Title, page` lines. It rewrites the book
   file after every entry.
 - `scripts/import-book.mjs`: paste (or pass a file of) the JSON an AI
-  produced from photos with `docs/cookbook-import-prompt.md`. `parseImport`
-  strips fences and chatter, then `validateBook` → `cleanBook` → `mergeBook`
-  (dedupes recipes by `titleKey`+page and index lines by term+sub, unioning
-  pages) → `checkBook` warnings. When asked to import from `photos/<book>/`
-  (git-ignored), follow that prompt, write the JSON to the scratchpad and run
+  produced from photos with `docs/cookbook-import-prompt.md`. The pipeline:
+  1. `parseImport` strips fences and chatter.
+  2. `validateBook`.
+  3. `cleanBook` drops `see`, removes lines with no pages and splits
+     "heading: dish".
+  4. `mergeBook` dedupes recipes by `titleKey`+page and index lines by
+     term+sub, unioning pages.
+  5. `promoteRecipes` moves a top-level index line into `recipes` when it's
+     also a sub-entry, or already a recipe, on the same page. It skips
+     headings with sub-entries (categories) and pages with `REFERENCE_PAGE`
+     (3) or more headings (glossaries).
+  6. `checkBook` warnings.
+
+  When asked to import from `photos/<book>/` (git-ignored), follow that
+  prompt, write the JSON to the scratchpad and run
   `npm run import-book -- <file> --no-git`, then `npm test`.
 
 Their pure logic lives in `scripts/lib/cookbooks.mjs` (parsing, slugify,

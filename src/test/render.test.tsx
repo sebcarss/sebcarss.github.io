@@ -30,6 +30,7 @@ vi.mock("@/tools/cookbooks/data", async (importActual) => {
       recipes: [
         { title: "Easy Pasta Bake", page: 80 },
         { title: "Tomato Soup", page: 5 },
+        { title: "Mac & Cheese", page: 20 },
       ],
     },
     // Imported from photos of its index, with no recipe titles.
@@ -123,7 +124,7 @@ describe("pages render", () => {
     const items = screen.getAllByRole("listitem");
     expect(items[0]!.textContent).toMatch(/Pasta Bake.*Exact.*Test Kitchen · p\. 34/);
     expect(screen.getByText("Easy Pasta Bake")).toBeTruthy();
-    expect(screen.getByText("Also mentions…")).toBeTruthy();
+    expect(screen.getByText("Close matches")).toBeTruthy();
     expect(screen.getByText("Chicken Pasta")).toBeTruthy();
     expect(screen.queryByText("Books")).toBeNull(); // no book is called "pasta bake"
     fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "sushi" } });
@@ -162,7 +163,13 @@ describe("pages render", () => {
   it("cookbooks: finds a recipe through the book's index, and shows the index", () => {
     at("/food/cookbooks", <Cookbooks />);
     fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "aubergine" } });
+    expect(screen.getByText(/No recipe is called that — see the ingredient matches below/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "By ingredient (1)" })).toBeTruthy();
     expect(screen.getAllByRole("listitem")[0]!.textContent).toMatch(/MoussakaIndex: AubergineTest Kitchen · p\. 12/);
+    // A recipe named like the query comes first, apart from the ingredient matches.
+    fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "cheese" } });
+    expect(screen.queryByText(/No recipe is called that/)).toBeNull();
+    expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Mac & CheeseWeeknight Suppers · p. 20", "Pasta BakeIndex: Cheese › ricottaTest Kitchen · p. 34"]);
     fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "" } });
     fireEvent.click(screen.getByText("Test Kitchen"));
     fireEvent.click(screen.getByText("Index"));
@@ -178,7 +185,8 @@ describe("pages render", () => {
     at("/food/cookbooks", <Cookbooks />);
     expect(screen.getByText("Index Only").closest("a")!.textContent).toMatch(/Index Only2 index lines/);
     fireEvent.change(screen.getByLabelText("Search recipes"), { target: { value: "pork belly" } });
-    expect(screen.getByText("Pork › roast belly")).toBeTruthy();
+    expect(screen.getByText("roast belly")).toBeTruthy();
+    expect(screen.getByText("Index: Pork › roast belly")).toBeTruthy();
     fireEvent.click(screen.getByText("Index Only"));
     expect(screen.getByRole("heading", { name: "Index Only" })).toBeTruthy();
     expect(screen.queryByText("Book not found")).toBeNull();

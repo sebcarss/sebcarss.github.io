@@ -12,7 +12,7 @@
 import { createInterface } from "node:readline/promises";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { checkBook, cleanBook, mergeBook, parseImport, serializeBook, slugForNewBook, validateBook } from "./lib/cookbooks.mjs";
+import { checkBook, cleanBook, mergeBook, parseImport, promoteRecipes, serializeBook, slugForNewBook, validateBook } from "./lib/cookbooks.mjs";
 import { BOOKS_DIR, commitAndPush, dim, green, loadBooks, root, startOnMaster, yellow } from "./lib/cli.mjs";
 
 const args = process.argv.slice(2);
@@ -73,6 +73,7 @@ async function main() {
   }
   const errors = validateBook(data);
   if (errors.length) return fail(`That JSON isn't in the right format:\n  ${errors.slice(0, 15).join("\n  ")}${errors.length > 15 ? `\n  …and ${errors.length - 15} more` : ""}`);
+  const seeRefs = (/** @type {any} */ (data).index ?? []).filter((/** @type {any} */ e) => e?.see).length;
   const incoming = cleanBook(/** @type {any} */ (data));
 
   // 2. Merge it into the book with the same name, or start a new one.
@@ -83,12 +84,15 @@ async function main() {
     data: { book: incoming.book, recipes: [] },
   };
   const merged = mergeBook(target.data, incoming);
+  // Dish names left in the index (cross-listed under their ingredients) become recipes.
+  const { book, promoted } = promoteRecipes(merged.book);
+  merged.recipes += promoted;
   const rel = relative(root, target.file);
-  const book = merged.book;
 
   console.log(`${existing ? "Updating" : "New book"} ${green(book.book)} ${dim(rel)}`);
-  console.log(`  +${merged.recipes} recipe(s)  → ${book.recipes.length} in total`);
+  console.log(`  +${merged.recipes} recipe(s)  → ${book.recipes.length} in total${promoted ? dim(` (${promoted} moved from the index)`) : ""}`);
   console.log(`  +${merged.index} index line(s) new or with new pages → ${book.index?.length ?? 0} in total`);
+  if (seeRefs) console.log(dim(`  Ignored ${seeRefs} "see" cross-reference(s); their pages are under their own headings.`));
   if (book.index?.length) {
     const sorted = book.index;
     console.log(dim(`  Index runs "${sorted[0]?.term}" … "${sorted[sorted.length - 1]?.term}" — check nothing was skipped.`));

@@ -4,7 +4,7 @@ import { ToolPage } from "@/components/ToolPage";
 import { Panel } from "@/components/Panel";
 import { Toggle } from "@/components/Toggle";
 import { BOOKS, ENTRIES, INDEX_ROWS, type Entry } from "./data";
-import { bookIndex, bookRecipes, bookSummaries, search, searchBooks, type BookSummary, type IndexGroup, type Match } from "./engine";
+import { bookIndex, bookRecipes, bookSummaries, search, searchBooks, type BookSummary, type IndexGroup, type Match, type SearchResults } from "./engine";
 
 const BOOK_MATCHES_SHOWN = 5;
 
@@ -58,8 +58,6 @@ function Results({ items, showBook }: { items: (Match | Entry)[]; showBook: bool
   );
 }
 
-const pageList = (pages: number[], see?: string) => [pages.join(", "), see && (pages.length ? `see also ${see}` : `see ${see}`)].filter(Boolean).join("; ");
-
 /** A book's index as printed: headings A–Z with their pages, sub-entries indented. */
 function IndexList({ groups }: { groups: IndexGroup[] }) {
   return (
@@ -68,12 +66,12 @@ function IndexList({ groups }: { groups: IndexGroup[] }) {
         <li key={g.term}>
           <div className="row">
             <span className="term">{g.term}</span>
-            <span className="meta">{pageList(g.pages, g.see)}</span>
+            <span className="meta">{g.pages.join(", ")}</span>
           </div>
           {g.subs.map((s) => (
             <div className="row sub" key={s.sub}>
               <span>{s.sub}</span>
-              <span className="meta">{pageList(s.pages, s.see)}</span>
+              <span className="meta">{s.pages.join(", ")}</span>
             </div>
           ))}
         </li>
@@ -82,18 +80,32 @@ function IndexList({ groups }: { groups: IndexGroup[] }) {
   );
 }
 
-/** Ranked recipe matches, with partial ones under their own heading. */
-function RecipeMatches({ matches, showBook }: { matches: Match[]; showBook: boolean }) {
-  const best = matches.filter((m) => m.kind !== "partial");
-  const partial = matches.filter((m) => m.kind === "partial");
-  if (!matches.length) return <p className="note">No recipes match — try fewer words.</p>;
+/**
+ * Recipes named like the query first (partial matches under their own
+ * heading), then, separately, the dishes the indexes list under it — ideas
+ * when the query is an ingredient.
+ */
+function RecipeMatches({ results, showBook }: { results: SearchResults; showBook: boolean }) {
+  const best = results.recipes.filter((m) => m.kind !== "partial");
+  const partial = results.recipes.filter((m) => m.kind === "partial");
+  if (!results.recipes.length && !results.index.length) return <p className="note">No recipes match — try fewer words.</p>;
   return (
     <>
-      {best.length > 0 && <Results items={best} showBook={showBook} />}
+      {best.length > 0 ? (
+        <Results items={best} showBook={showBook} />
+      ) : (
+        <p className="note">No recipe is called that{results.index.length ? " — see the ingredient matches below" : ""}.</p>
+      )}
       {partial.length > 0 && (
         <>
-          <h3>{best.length ? "Also mentions…" : "Close matches"}</h3>
+          <h3>Close matches</h3>
           <Results items={partial} showBook={showBook} />
+        </>
+      )}
+      {results.index.length > 0 && (
+        <>
+          <h3>By ingredient ({results.index.length})</h3>
+          <Results items={results.index} showBook={showBook} />
         </>
       )}
     </>
@@ -112,7 +124,7 @@ export function Cookbooks() {
   const view = open && open.index > 0 && (wantIndex || open.recipes === 0) ? "index" : "recipes";
 
   const bookMatches = useMemo(() => (typing && !book ? searchBooks(q, books) : []), [q, book, typing, books]);
-  const recipeMatches = useMemo(() => (typing ? search(q, ENTRIES, { book: book || undefined, index: INDEX_ROWS }) : []), [q, book, typing]);
+  const recipeMatches = useMemo(() => search(typing ? q : "", ENTRIES, { book: book || undefined, index: INDEX_ROWS }), [q, book, typing]);
   const contents = useMemo(() => (open ? bookRecipes(ENTRIES, open.book) : []), [open]);
   const indexGroups = useMemo(() => bookIndex((open && BOOKS.find((b) => b.book === open.book)?.index) || []), [open]);
   const indexed = books.filter((b) => b.index > 0).length;
@@ -168,7 +180,7 @@ export function Cookbooks() {
               <p className="note book-count">{bookCount(open)}</p>
               {searchBox}
               {typing ? (
-                <RecipeMatches matches={recipeMatches} showBook={false} />
+                <RecipeMatches results={recipeMatches} showBook={false} />
               ) : (
                 <>
                   {open.recipes > 0 && indexGroups.length > 0 && (
@@ -217,7 +229,7 @@ export function Cookbooks() {
                 </Panel>
               )}
               <Panel title="Recipes">
-                <RecipeMatches matches={recipeMatches} showBook />
+                <RecipeMatches results={recipeMatches} showBook />
               </Panel>
             </>
           ) : (

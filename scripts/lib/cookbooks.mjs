@@ -3,7 +3,7 @@
 // src/tools/cookbooks/data.ts.
 
 /** @typedef {{ title: string, page: number }} Recipe */
-/** @typedef {{ term: string, sub?: string, pages?: number[], see?: string }} IndexEntry */
+/** @typedef {{ term: string, sub?: string, pages: number[] }} IndexEntry */
 /** @typedef {{ book: string, recipes: Recipe[], index?: IndexEntry[] }} Book */
 /**
  * @typedef {{ kind: "command", command: "undo" | "list" | "quit" | "help" }
@@ -104,8 +104,7 @@ export const sortIndex = (index) =>
 function indexLine(e) {
   const parts = [`"term": ${JSON.stringify(e.term)}`];
   if (e.sub) parts.push(`"sub": ${JSON.stringify(e.sub)}`);
-  if (e.pages?.length) parts.push(`"pages": [${uniquePages(e.pages).join(", ")}]`);
-  if (e.see) parts.push(`"see": ${JSON.stringify(e.see)}`);
+  parts.push(`"pages": [${uniquePages(e.pages).join(", ")}]`);
   return `    { ${parts.join(", ")} }`;
 }
 
@@ -144,31 +143,78 @@ export function validateBook(obj) {
     const where = `index entry ${i + 1}${e && isText(e.term) ? ` (${e.term})` : ""}`;
     if (!e || !isText(e.term)) errors.push(`${where}: missing term`);
     if (e?.sub !== undefined && !isText(e.sub)) errors.push(`${where}: "sub" must be a non-empty string`);
-    if (e?.see !== undefined && !isText(e.see)) errors.push(`${where}: "see" must be a non-empty string`);
+    // A "see" cross-reference is allowed here (cleanBook drops it), so a line may have no pages.
     if (e?.pages !== undefined && (!Array.isArray(e.pages) || !e.pages.every((/** @type {any} */ p) => Number.isInteger(p) && p >= 1)))
       errors.push(`${where}: pages must be whole numbers ≥ 1`);
-    if (e && !e.pages?.length && e.see === undefined) errors.push(`${where}: needs pages or "see"`);
   });
   return errors;
 }
 
 /**
  * Tidy a book that just passed validateBook: trimmed text, pages sorted and
- * de-duplicated, empty "pages" dropped.
- * @param {Book} book
+ * de-duplicated. "see" cross-references are dropped (the pages they point at
+ * are indexed under their own headings), and so is a line left with no pages.
+ * A heading and its only sub-entry printed on one line ("pizza: American hot
+ * pizza pie") becomes term + sub.
+ * @param {{ book: string, recipes: Recipe[], index?: { term: string, sub?: string, pages?: number[] }[] }} book
  * @returns {Book}
  */
 export function cleanBook(book) {
   const t = (/** @type {string} */ s) => s.replace(/\s+/g, " ").trim();
   const out = /** @type {Book} */ ({ book: t(book.book), recipes: book.recipes.map((r) => ({ title: t(r.title), page: r.page })) });
-  if (book.index?.length)
-    out.index = book.index.map((e) => ({
-      term: t(e.term),
-      ...(e.sub ? { sub: t(e.sub) } : {}),
-      ...(e.pages?.length ? { pages: uniquePages(e.pages) } : {}),
-      ...(e.see ? { see: t(e.see) } : {}),
-    }));
+  const index = (book.index ?? []).flatMap((e) => {
+    if (!e.pages?.length) return [];
+    const [head, ...rest] = e.sub ? [e.term] : t(e.term).split(": ");
+    const sub = e.sub ?? (rest.length ? rest.join(": ") : undefined);
+    return [{ term: t(head ?? e.term), ...(sub ? { sub: t(sub) } : {}), pages: uniquePages(e.pages) }];
+  });
+  if (index.length) out.index = index;
   return out;
+}
+
+/** The dish an index sub-entry names: "shoulder: American hot pizza pie" → "American hot pizza pie". */
+export const subDish = (/** @type {string} */ sub) => sub.slice(sub.lastIndexOf(": ") + 1).trim();
+
+/** Top-level index headings on one page that make it a reference page rather than a recipe. */
+export const REFERENCE_PAGE = 3;
+
+/**
+ * Move dish names out of the index into "recipes". A heading with no sub is a
+ * dish when it's also listed as a sub-entry on the same page (the book
+ * cross-lists "American hot pizza pie 160" under cheese, pork, tomatoes…) or
+ * is already a recipe there; "pork 154" isn't, so it stays, and neither does a
+ * heading with sub-entries of its own or anything on a page REFERENCE_PAGE or
+ * more headings point at. Pages the dish
+ * doesn't account for stay in the index.
+ * @param {Book} book
+ * @returns {{ book: Book, promoted: number }}
+ */
+export function promoteRecipes(book) {
+  const index = book.index ?? [];
+  // Dishes on a page: the book's recipes and every sub-entry (whole, or the part after "x: ").
+  const listed = new Set([
+    ...book.recipes.map((r) => `${titleKey(r.title)}|${r.page}`),
+    ...index.flatMap((e) => (e.sub ? e.pages.flatMap((p) => [`${titleKey(e.sub ?? "")}|${p}`, `${titleKey(subDish(e.sub ?? ""))}|${p}`]) : [])),
+  ]);
+  // A page many headings point at is a glossary or technique page ("Mirin 14", "Miso 14"…), not a dish.
+  const headings = new Map();
+  for (const e of index) if (!e.sub) for (const p of e.pages) headings.set(p, (headings.get(p) ?? 0) + 1);
+  // A heading with sub-entries of its own ("smoothies › peach Melba") is a category.
+  const categories = new Set(index.filter((e) => e.sub).map((e) => titleKey(e.term)));
+  let out = book;
+  let promoted = 0;
+  const kept = index.flatMap((e) => {
+    const page = e.sub || categories.has(titleKey(e.term)) ? undefined : e.pages.find((p) => headings.get(p) < REFERENCE_PAGE && listed.has(`${titleKey(e.term)}|${p}`));
+    if (page === undefined) return [e];
+    const recipe = { title: e.term, page };
+    if (!isDuplicate(out, recipe)) {
+      out = addRecipe(out, recipe);
+      promoted++;
+    }
+    const pages = e.pages.filter((p) => p !== page);
+    return pages.length ? [{ term: e.term, pages }] : [];
+  });
+  return { book: kept.length ? { ...out, index: kept } : { book: out.book, recipes: out.recipes }, promoted };
 }
 
 /**
@@ -198,48 +244,13 @@ export function mergeBook(existing, incoming) {
       changed++;
       continue;
     }
-    const pages = uniquePages([...(prev.pages ?? []), ...(e.pages ?? [])]);
-    const see = prev.see ?? e.see;
-    if (pages.length === (prev.pages?.length ?? 0) && see === prev.see) continue;
-    index.set(k, { term: prev.term, ...(prev.sub ? { sub: prev.sub } : {}), ...(pages.length ? { pages } : {}), ...(see ? { see } : {}) });
+    const pages = uniquePages([...prev.pages, ...e.pages]);
+    if (pages.length === prev.pages.length) continue;
+    index.set(k, { term: prev.term, ...(prev.sub ? { sub: prev.sub } : {}), pages });
     changed++;
   }
   if (index.size) book = { ...book, index: sortIndex([...index.values()]) };
   return { book, recipes, index: changed };
-}
-
-/**
- * The headings a "see" points at. Printed indexes write lists ("butter beans,
- * white beans etc", "blue cheese; goat's cheese", "dried fruit and apples")
- * and name a heading by its start ("see smoked haddock" for "smoked haddock,
- * scrambled eggs with"), so try the whole text, then each part, then each
- * "and" half. For each name: an exact heading, else one it begins.
- * @param {string} see
- * @param {string[]} terms every heading in the book's index
- * @returns {string[]} matching headings as written, possibly none
- */
-export function resolveSee(see, terms) {
-  const keys = new Map();
-  for (const t of terms) if (!keys.has(titleKey(t))) keys.set(titleKey(t), t);
-  const find = (/** @type {string} */ name) => {
-    const k = titleKey(name.replace(/\s*\betc\.?\s*$/i, ""));
-    if (!k) return null;
-    if (keys.has(k)) return keys.get(k);
-    for (const [key, t] of keys) if (key.startsWith(k + " ")) return t;
-    return null;
-  };
-  const whole = find(see);
-  if (whole) return [whole];
-  const out = [];
-  for (const part of see.split(/[;,]/)) {
-    const hit = find(part);
-    if (hit) out.push(hit);
-    else for (const half of part.split(/\s+and\s+/)) {
-      const h = find(half);
-      if (h) out.push(h);
-    }
-  }
-  return [...new Set(out)];
 }
 
 /**
@@ -251,14 +262,12 @@ export function resolveSee(see, terms) {
 export function checkBook(book) {
   const warnings = [];
   const index = book.index ?? [];
-  const terms = index.map((e) => e.term);
   const lastRecipe = Math.max(0, ...book.recipes.map((r) => r.page));
   for (const e of index) {
     const name = e.sub ? `${e.term} › ${e.sub}` : e.term;
-    if (e.see && !resolveSee(e.see, terms).length) warnings.push(`"${name}" says see "${e.see}", which matches no heading in the index (yet?)`);
-    const late = lastRecipe ? (e.pages ?? []).filter((p) => p > lastRecipe + 10) : [];
+    const late = lastRecipe ? e.pages.filter((p) => p > lastRecipe + 10) : [];
     if (late.length) warnings.push(`"${name}" p. ${late.join(", ")} is after the last recipe (p. ${lastRecipe}); misread?`);
-    if (/\[\?\]/.test(`${name} ${e.see ?? ""}`)) warnings.push(`"${name}" was marked unreadable [?]; check it and fix the file`);
+    if (/\[\?\]/.test(name)) warnings.push(`"${name}" was marked unreadable [?]; check it and fix the file`);
   }
   for (const r of book.recipes) if (/\[\?\]/.test(r.title)) warnings.push(`"${r.title}" (p. ${r.page}) was marked unreadable [?]; check it and fix the file`);
   return warnings;
