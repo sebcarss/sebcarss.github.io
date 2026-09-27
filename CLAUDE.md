@@ -9,7 +9,8 @@ Seb Carss's personal homepage at sebcarss.github.io. Two halves:
 - **Food calculators** — a Vite + React 19 + TypeScript single-page app in
   `src/`, installable as a PWA (`vite-plugin-pwa`) so it works offline on a
   phone. Routes: `/`, `/food/`, `/food/ice-cream-calculator/`,
-  `/food/bakers-percentage/`, `/food/ramen-noodles/`, `/food/cookbooks/`.
+  `/food/bakers-percentage/`, `/food/ramen-noodles/`, `/food/cookbooks/`,
+  `/food/flavour-library/`.
 - **Music tools** — `public/music/**` (Tab Caster, Scale Charts). Plain,
   self-contained static HTML that the build copies through unchanged. They
   link `/styles.css`, which lives at `public/styles.css`. Don't refactor them
@@ -223,6 +224,33 @@ round-trips through `BookSchema`, so keep the two formats in sync.
 only that file with `git commit -- <file>`, then `pull --rebase --autostash`,
 then push). Input is read via the readline async iterator, never
 `for await` (which closes readline), so piped or pasted lines aren't dropped.
+
+## Flavour Library (`src/tools/flavours/`)
+
+A search page like the Cookbook Finder (no `compute`, `useDraft` or
+`RecipeBar`; state is the URL: `q`, `kind`, `region`). "I have a steak and
+some greens" → rubs, marinades and sauces that go with it.
+
+- `recipes.json`: one entry per recipe, validated by `FlavourSchema` in
+  `data.ts`. `pairsWith` uses the fixed `TAGS` (proteins + sides; `steak` and
+  `salmon` are narrower tags that sit on top of `beef` and `fish`).
+- **Sources.** Every recipe was checked against a recipe site reachable from
+  the dev container (`SOURCE_HOSTS`, from the firewall allowlist in
+  `/workspace/.devcontainer/init-firewall.sh`). `source` is the page it was
+  checked against. `source: null` means no reachable site had it: the page
+  shows it as **AI generated**. Don't add a source you couldn't fetch.
+  Ingredients follow the source; the method is summarised in our own words.
+- **Metric only**, except tsp/tbsp: `unit` is one of `UNITS`, and
+  `data.test.ts` fails on cups, oz, lb, inches, sticks or °F anywhere in the
+  text. US cups → 240 ml, Australian cups → 250 ml, dry cups → grams per
+  ingredient.
+- `engine.ts` `suggest({ text, kind, region }, FLAVOURS)` is pure. Free text →
+  tags via `SYNONYMS` (two-word phrases first). Cut words (`CUTS`: fillet,
+  chop, thigh…) only count when no protein is named, so "salmon fillet"
+  isn't steak. Score = 3 per protein tag + 1 per side tag + 5 × `wordMatch`
+  for the leftover words against name + cuisine (so "diane" or "korean"
+  work), reusing the Cookbook Finder's `normalize`/`singular`/`wordMatch`.
+  No text lists everything A–Z.
 
 ## Guitar School (`src/tools/guitar/`)
 

@@ -8,6 +8,7 @@ import { IceCream } from "@/tools/ice-cream/IceCream";
 import { Bread } from "@/tools/bread/Bread";
 import { Ramen } from "@/tools/ramen/Ramen";
 import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
+import { Flavours } from "@/tools/flavours/Flavours";
 import { Guitar } from "@/tools/guitar/pages/Guitar";
 import { Course } from "@/tools/guitar/pages/Course";
 import { Day } from "@/tools/guitar/pages/Day";
@@ -76,6 +77,7 @@ describe("pages render", () => {
     at("/food", <Food />);
     expect(screen.getByText(/Ramen Noodle Calculator/)).toBeTruthy();
     expect(screen.getByText(/Cookbook Finder/)).toBeTruthy();
+    expect(screen.getByText(/Flavour Library/)).toBeTruthy();
     expect(screen.getByText(/Export all/)).toBeTruthy();
   });
 
@@ -205,6 +207,30 @@ describe("pages render", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("Book not found")).toBeTruthy();
+  });
+
+  it("flavours: suggests for what you've got, shows the source or the AI flag, and filters", () => {
+    at("/food/flavour-library", <Flavours />);
+    expect(screen.getByText(/Sauces \(\d+\)/)).toBeTruthy(); // browse: everything
+    fireEvent.change(screen.getByLabelText("Ingredients"), { target: { value: "steak, broccoli" } });
+    const diane = screen.getByText("Diane sauce").closest("details")!;
+    expect(diane.textContent).toMatch(/BBC Food/);
+    fireEvent.click(diane.querySelector("summary")!);
+    const link = within(diane).getByRole("link");
+    expect(link.getAttribute("href")).toBe("https://www.bbc.co.uk/food/recipes/diane_sauce_57749");
+    expect(diane.textContent).toMatch(/300ml double cream/);
+    expect(screen.getByText("Texas SPG rub (salt, pepper, garlic)").closest("details")!.textContent).toMatch(/AI generated/);
+    fireEvent.click(screen.getByRole("button", { name: "Rubs" }));
+    expect(screen.queryByText("Diane sauce")).toBeNull();
+    expect(screen.queryByText(/Sauces \(/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    fireEvent.change(screen.getByLabelText("Ingredients"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salmon" }));
+    expect((screen.getByLabelText("Ingredients") as HTMLInputElement).value).toBe("salmon");
+    expect(screen.queryByText("Diane sauce")).toBeNull();
+    expect(screen.getByText("Teriyaki sauce")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Ingredients"), { target: { value: "xyzzy" } });
+    expect(screen.getByText(/Nothing matches/)).toBeTruthy();
   });
 
   it("guitar: the hub lists the finger picking course and the course shows its plan and tests", () => {

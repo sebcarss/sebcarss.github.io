@@ -16,6 +16,9 @@ export const FOOD_CARDS = (
     <Card to="/food/cookbooks/" title="Cookbook Finder" emoji="📚">
       Search the cookbooks on my shelf for a recipe and get the book and page number.
     </Card>
+    <Card to="/food/flavour-library/" title="Flavour Library" emoji="🌶️">
+      Rubs, marinades and sauces from around the world. Say what you've got and get ideas to make it great.
+    </Card>
     <Card to="https://dreamingofnoodles.com" title="Dreaming of Noodles" emoji="🥢" external>
       My Japanese food blog.
     </Card>

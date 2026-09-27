@@ -7,6 +7,7 @@ import { IceCream } from "@/tools/ice-cream/IceCream";
 import { Bread } from "@/tools/bread/Bread";
 import { Ramen } from "@/tools/ramen/Ramen";
 import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
+import { Flavours } from "@/tools/flavours/Flavours";
 import { Guitar } from "@/tools/guitar/pages/Guitar";
 import { Course } from "@/tools/guitar/pages/Course";
 import { Day } from "@/tools/guitar/pages/Day";
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: "/food/bakers-percentage", element: <Bread /> },
       { path: "/food/ramen-noodles", element: <Ramen /> },
       { path: "/food/cookbooks", element: <Cookbooks /> },
+      { path: "/food/flavour-library", element: <Flavours /> },
       { path: "/guitar", element: <Guitar /> },
       { path: "/guitar/:course", element: <Course /> },
       { path: "/guitar/:course/day/:n", element: <Day /> },

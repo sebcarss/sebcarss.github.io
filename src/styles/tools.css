@@ -227,3 +227,29 @@ textarea { width: 100%; min-height: 4.5rem; resize: vertical; }
 .delta td { border-top: 1px solid var(--border); }
 .delta td:nth-child(2) { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .delta td:last-child { color: var(--muted); white-space: nowrap; }
+
+/* Flavour library */
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.85rem; }
+.chip { font: inherit; font-size: 0.85rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 0.3rem 0.8rem; min-height: 2rem; cursor: pointer; }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+.filters .toggle { margin-bottom: 0; }
+.filters select { min-height: 2.1rem; }
+.flavours li { display: block; padding: 0; }
+.flavour summary { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.55rem 0; cursor: pointer; list-style: none; }
+.flavour summary::-webkit-details-marker { display: none; }
+.flavour summary .name { font-weight: 600; }
+.flavour summary .name::before { content: "▸ "; color: var(--muted); font-weight: 400; }
+.flavour[open] summary .name::before { content: "▾ "; }
+.flavour summary .meta { padding-left: 1rem; }
+.flavour-body { padding: 0 0 0.9rem 1rem; font-size: 0.95rem; }
+.flavour-body h4 { margin: 0.8rem 0 0.3rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.flavour-body ul, .flavour-body ol { margin: 0; padding-left: 1.25rem; }
+.flavour-body li { display: list-item; border: 0; padding: 0.1rem 0; }
+.flavour-body .note strong { color: var(--text); }
+.flavour-body .tip { margin: 0.75rem 0 0; padding: 0.5rem 0.65rem; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.9rem; }
+.flavour-body .source { margin: 0.75rem 0 0; font-size: 0.85rem; color: var(--muted); }
+.flavour-body .source a { color: var(--accent); }
+.flavour-body .source.ai { color: var(--warn); }
+.badge.ai { background: var(--warn-soft); color: var(--warn); }

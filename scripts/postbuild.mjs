@@ -15,6 +15,7 @@ const routes = [
   "food/bakers-percentage",
   "food/ramen-noodles",
   "food/cookbooks",
+  "food/flavour-library",
   "guitar",
   // One per course, plus its days (src/tools/guitar/registry.ts).
   "guitar/fingerpicking",
