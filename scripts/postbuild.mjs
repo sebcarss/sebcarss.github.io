@@ -9,7 +9,17 @@ const dist = new URL("../dist/", import.meta.url).pathname;
 const index = join(dist, "index.html");
 
 // Keep in sync with src/routes.tsx.
-const routes = ["food", "food/ice-cream-calculator", "food/bakers-percentage", "food/ramen-noodles", "food/cookbooks"];
+const routes = [
+  "food",
+  "food/ice-cream-calculator",
+  "food/bakers-percentage",
+  "food/ramen-noodles",
+  "food/cookbooks",
+  "guitar",
+  // One per course, plus its days (src/tools/guitar/registry.ts).
+  "guitar/fingerpicking",
+  ...[1, 2, 3, 4, 5, 6, 7].map((n) => `guitar/fingerpicking/day/${n}`),
+];
 
 for (const route of routes) {
   const dir = join(dist, route);

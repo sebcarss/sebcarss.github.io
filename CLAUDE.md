@@ -14,6 +14,9 @@ Seb Carss's personal homepage at sebcarss.github.io. Two halves:
   self-contained static HTML that the build copies through unchanged. They
   link `/styles.css`, which lives at `public/styles.css`. Don't refactor them
   into the React app; they only make sense cast to a TV from a desktop.
+- **Guitar School** — `src/tools/guitar/`, SPA routes `/guitar/`,
+  `/guitar/<course>/` and `/guitar/<course>/day/<n>/` (practice happens on a
+  phone next to the guitar, so it lives in the PWA, not under `/music/`).
 
 Commands: `npm run dev`, `npm test` (vitest), `npm run build` (runs `tsc
 --noEmit` first, then `scripts/postbuild.mjs`), `npm run preview`,
@@ -220,3 +223,38 @@ round-trips through `BookSchema`, so keep the two formats in sync.
 only that file with `git commit -- <file>`, then `pull --rebase --autostash`,
 then push). Input is read via the readline async iterator, never
 `for await` (which closes readline), so piped or pasted lines aren't dropped.
+
+## Guitar School (`src/tools/guitar/`)
+
+Courses are pure data (`schema.ts`, zod): course → days → blocks (warmup,
+technique, pattern, challenge, review; minutes must sum to
+`minutesPerDay`, a test) → exercises pointing at a tab pattern by id, with an
+optional `challenge` (pass `criteria` + a `checklist` for what the mic can't
+hear). Course-level `tests` are the benchmark: `baseline` ones are taken on
+day 1, all of them on the last day. A new sub-domain (e.g. country) is one
+file in `courses/` plus one line in `registry.ts`, plus its paths in
+`scripts/postbuild.mjs`.
+
+- `patterns.ts`: chord shapes with a bass map (`R` root / `A` alternate
+  string) and templates over roles (`R A B 3 2 1`), so one template plays
+  over any progression. `travis()` takes melody and bass-walk overrides;
+  `strumBar()` does brush / flick / up / chunk. `PATTERNS` holds every tab,
+  including the "Lanterns" capstone (37 bars built from its sections).
+- `engine/` is pure and tested: `rhythm.ts` (event times, speed trainer,
+  `expectedOnsets` with thumb/finger group, on/off-beat, chord change, slurs
+  optional); `onset.ts` (spectral-flux onsets over 0–1.8 kHz at ~11 kHz,
+  ~6 ms accuracy; `estimateLatency`); `timing.ts` (`analyseTiming` in
+  "click" mode vs the grid or "free" mode vs a tempo fitted to the player,
+  `judge` against criteria, `diagnose` → plain-English causes);
+  `progress.ts` (reducer, `carryOver` of unpassed challenges into the next
+  warm-up, `dayStatus`). Progress is one object under
+  `sc:guitar:progress:v1`; challenge/test/exercise keys are
+  `<course>:<id>`.
+- `audio/`: `synth.ts` (shared AudioContext, Karplus-Strong demo, the click
+  is a soft-attack 4.2 kHz blip so the detector ignores it — keep the test in
+  `onset.test.ts` in step if it changes), `transport.ts` (look-ahead
+  scheduler; `claim()` keeps one player at a time), `mic.ts` (ScriptProcessor
+  capture with echo cancellation/AGC off; nothing stored).
+- A take: calibrate once (8 muted plucks → `latencyMs`), then count-in +
+  take, onsets shifted by capture start − latency, analysed and recorded as
+  an attempt. Self-assessment is the fallback without a mic.

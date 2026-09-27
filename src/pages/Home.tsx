@@ -14,6 +14,9 @@ export function Home() {
           <span aria-hidden="true">🎵</span> Music
         </h2>
         <div className="cards">
+          <Card to="/guitar/" title="Guitar School" emoji="🖐️">
+            Structured guitar courses with real challenges and a timing check that listens to you play. Starts with a 7-day finger picking course.
+          </Card>
           <Card to="/music/tab-caster/" title="Tab Caster" emoji="🎸">
             Turn an Ultimate Guitar PDF into a single-screen tab you can cast to a TV.
           </Card>

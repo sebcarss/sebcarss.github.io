@@ -4,8 +4,10 @@ Personal homepage and small utilities, served from
 [sebcarss.github.io](https://sebcarss.github.io).
 
 The food calculators and cookbook finder are a Vite + React + TypeScript app that installs as a
-PWA and works offline on a phone. The music tools are plain static pages
-under `public/music/` and are served as-is.
+PWA and works offline on a phone. Guitar School (`/guitar/`) is
+part of the same app: day-by-day guitar courses with tab, audio demos, a
+speed trainer and a mic-based timing check. The music tools are plain static
+pages under `public/music/` and are served as-is.
 
 ## Running locally
 

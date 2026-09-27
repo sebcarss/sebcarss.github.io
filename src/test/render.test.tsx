@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { Home } from "@/pages/Home";
 import { Food } from "@/pages/Food";
@@ -8,6 +8,10 @@ import { IceCream } from "@/tools/ice-cream/IceCream";
 import { Bread } from "@/tools/bread/Bread";
 import { Ramen } from "@/tools/ramen/Ramen";
 import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
+import { Guitar } from "@/tools/guitar/pages/Guitar";
+import { Course } from "@/tools/guitar/pages/Course";
+import { Day } from "@/tools/guitar/pages/Day";
+import { PROGRESS_KEY } from "@/tools/guitar/useProgress";
 
 // Fixed books so the smoke test doesn't depend on the real data files.
 vi.mock("@/tools/cookbooks/data", async (importActual) => {
@@ -201,5 +205,82 @@ describe("pages render", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("Book not found")).toBeTruthy();
+  });
+
+  it("guitar: the hub lists the finger picking course and the course shows its plan and tests", () => {
+    at("/guitar", <Guitar />);
+    expect(screen.getByText("Finger Picking").closest("a")!.getAttribute("href")).toBe("/guitar/fingerpicking/");
+    cleanup();
+    render(
+      <MemoryRouter initialEntries={["/guitar/fingerpicking"]}>
+        <Routes>
+          <Route path="/guitar/:course" element={<Course />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Start day 1 ›")).toBeTruthy();
+    expect(screen.getAllByText(/^Day \d$/)).toHaveLength(7);
+    expect(screen.getByText("Travis at 90")).toBeTruthy();
+    expect(screen.getByText(/0 of 7 exit tests passed/)).toBeTruthy();
+  });
+
+  it("guitar: a day renders its blocks and tab, self-assessment records progress, and failures carry over", () => {
+    const day = (n: number) =>
+      render(
+        <MemoryRouter initialEntries={[`/guitar/fingerpicking/day/${n}`]}>
+          <Routes>
+            <Route path="/guitar/:course/day/:n" element={<Day />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    day(1);
+    expect(screen.getByRole("heading", { name: /Day 1: Hand setup/ })).toBeTruthy();
+    expect(screen.getAllByText("Why it works").length).toBeGreaterThan(2);
+    expect(screen.getAllByRole("img", { name: /^Bar 1, C$/ }).length).toBeGreaterThan(0);
+    // Baseline tests are on day 1.
+    expect(screen.getByRole("heading", { name: "Baseline: Travis at 90" })).toBeTruthy();
+
+    // Self-assess the alternating-bass challenge: needs its checklist ticked first.
+    const card = screen.getByText(/Alternating bass through C–Am–Fmaj7–G for 8 bars at 80/).closest(".challenge") as HTMLElement;
+    const passBtn = within(card).getByRole("button", { name: "Passed" });
+    expect((passBtn as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(card).getByLabelText(/Right root string on every chord/));
+    fireEvent.click(passBtn);
+    expect(within(card).getByText(/Passed at 80 bpm/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Finish day 1" }));
+    const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY)!);
+    expect(saved.challenges["fingerpicking:c-thumb-alt"].passed).toBe(true);
+    expect(saved.days["fingerpicking:1"].completedAt).toBeTruthy();
+    cleanup();
+
+    // The untried day-1 challenge moves to day 2's warm-up.
+    day(2);
+    expect(screen.getByText("Revisit from day 1")).toBeTruthy();
+    expect(screen.getByText(/p-i-m-a over C–Am–G–Em for 8 bars at 70/)).toBeTruthy();
+    expect(screen.queryByText(/Alternating bass through C–Am–Fmaj7–G for 8 bars at 80/)).toBeNull();
+  });
+
+  it("guitar: day 7 has the capstone and all seven exit tests", () => {
+    render(
+      <MemoryRouter initialEntries={["/guitar/fingerpicking/day/7"]}>
+        <Routes>
+          <Route path="/guitar/:course/day/:n" element={<Day />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByRole("heading", { name: /^Exit test: / })).toHaveLength(7);
+    expect(screen.getByRole("heading", { name: "Lanterns, start to finish" })).toBeTruthy();
+    expect(screen.getAllByRole("img", { name: /^Bar 37/ }).length).toBe(1);
+  });
+
+  it("guitar: an unknown course or day is not found", () => {
+    render(
+      <MemoryRouter initialEntries={["/guitar/fingerpicking/day/9"]}>
+        <Routes>
+          <Route path="/guitar/:course/day/:n" element={<Day />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("heading", { name: /^Day 9/ })).toBeNull();
   });
 });
