@@ -215,6 +215,7 @@ describe("pages render", () => {
     fireEvent.change(screen.getByLabelText("Ingredients"), { target: { value: "steak, broccoli" } });
     const diane = screen.getByText("Diane sauce").closest("li")!;
     expect(diane.textContent).toMatch(/Goes with .*steak/);
+    expect(diane.querySelector(".about")!.textContent).toMatch(/creamy/); // what it tastes like
     expect(within(diane).queryAllByRole("link")).toHaveLength(0);
     expect(document.querySelectorAll(".flavours a")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Rubs" }));

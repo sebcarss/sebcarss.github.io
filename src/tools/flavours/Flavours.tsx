@@ -29,6 +29,7 @@ function Card({ s }: { s: Suggestion }) {
         {f.cuisine}
         {f.heat ? <span aria-label={`heat ${f.heat} of 3`}> · {"🌶".repeat(f.heat)}</span> : null}
       </span>
+      <span className="about">{f.about}</span>
       <span className="note">
         Goes with {f.pairsWith.map((t) => (s.matched.includes(t) ? <strong key={t}>{t} </strong> : t + " "))}
         {f.cooking && <> · {f.cooking.join(", ")}</>}

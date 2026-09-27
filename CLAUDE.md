@@ -233,10 +233,13 @@ some greens" → rubs, marinades and sauces that go with it.
 
 - **A pairing index only.** `flavours.json` holds the names of rubs,
   marinades and sauces and what they go with: `id`, `name`, `kind`,
-  `cuisine`, `region`, `pairsWith`, `cooking`, `heat`. No ingredients,
-  methods, tips or links to recipe sites (copyright: Seb looks the recipes
-  up himself). Don't add them back; `data.test.ts` fails on any other key
-  or a URL.
+  `cuisine`, `region`, `about`, `pairsWith`, `cooking`, `heat`. `about` is
+  a short description in our own words: what it is, its flavour profile
+  (e.g. ponzu is citrusy, sweet-sour and salty) and what it suits. It may
+  name the defining ingredients but never quantities, method or timings.
+  No ingredient lists, methods or links to recipe sites (copyright: Seb
+  looks the recipes up himself). Don't add them back; `data.test.ts` fails
+  on any other key, a URL, or a number/measure/step in `about`.
 - Entries are validated by `FlavourSchema` in `data.ts`. `pairsWith` uses
   the fixed `TAGS` (proteins + sides; `steak` and `salmon` are narrower tags
   that sit on top of `beef` and `fish`).

@@ -2,8 +2,9 @@ import { z } from "zod";
 import raw from "./flavours.json";
 
 // The Flavour Library: a pairing index of rubs, marinades and sauces in
-// flavours.json. Names and what they go with only; no ingredients, methods or
-// source links (look the recipe up yourself).
+// flavours.json. Names, a short description of each (what it is, how it
+// tastes, what it's good with) and what it goes with; no ingredient lists,
+// quantities, methods or source links (look the recipe up yourself).
 
 export const KINDS = ["rub", "marinade", "sauce"] as const;
 export const REGIONS = ["Africa", "Americas", "Asia", "Europe", "Middle East", "Oceania"] as const;
@@ -24,6 +25,7 @@ export const FlavourSchema = z.object({
   kind: z.enum(KINDS),
   cuisine: z.string().trim().min(1),
   region: z.enum(REGIONS),
+  about: z.string().trim().min(1).max(500),
   pairsWith: z.array(z.enum(TAGS)).min(1),
   cooking: z.array(z.enum(COOKING)).optional(),
   heat: z.number().int().min(0).max(3).optional(),

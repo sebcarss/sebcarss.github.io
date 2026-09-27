@@ -29,6 +29,13 @@ describe("flavours.json", () => {
     }
   });
 
+  it("describes rather than gives a recipe: no quantities or steps", () => {
+    for (const f of parseFlavours(list)) {
+      expect(f.about, f.id).not.toMatch(/\d|\b(tbsp|tsp|tablespoons?|teaspoons?|cups?|grams?|ml|oz|minutes?|hours?)\b/i);
+      expect(f.about, f.id).not.toMatch(/\b(step|method|whisk until|preheat)\b/i);
+    }
+  });
+
   it("has every kind", () => {
     const all = parseFlavours(list);
     for (const k of KINDS) expect(all.some((f) => f.kind === k), k).toBe(true);
