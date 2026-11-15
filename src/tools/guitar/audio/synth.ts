@@ -62,9 +62,14 @@ function pluck(c: AudioContext, midi: number, mute: boolean): AudioBuffer {
 /** Everything a Transport schedules, so stop() can silence it. */
 export type Sink = (node: AudioScheduledSourceNode) => void;
 
-function playBuffer(c: AudioContext, dest: AudioNode, buf: AudioBuffer, when: number, gain: number, sink: Sink) {
+function playBuffer(c: AudioContext, dest: AudioNode, buf: AudioBuffer, when: number, gain: number, sink: Sink, bend = 0) {
   const src = c.createBufferSource();
   src.buffer = buf;
+  if (bend) {
+    // A bend: start on the fretted note and push up to the target pitch.
+    src.playbackRate.setValueAtTime(1, when);
+    src.playbackRate.linearRampToValueAtTime(2 ** (bend / 6), when + 0.14);
+  }
   const g = c.createGain();
   g.gain.value = gain;
   src.connect(g).connect(dest);
@@ -81,7 +86,7 @@ export function playEvent(c: AudioContext, dest: AudioNode, ev: TabEvent, when: 
     if (ev.accent) g *= 1.6;
     if (ev.slur) g *= 0.7;
     if (strum) g *= 0.55;
-    playBuffer(c, dest, pluck(c, midiOf(n), !!n.mute), t, g, sink);
+    playBuffer(c, dest, pluck(c, midiOf(n), !!n.mute), t, g, sink, ev.bend);
   });
 }
 

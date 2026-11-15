@@ -16,7 +16,8 @@ Seb Carss's personal homepage at sebcarss.github.io. Two halves:
   link `/styles.css`, which lives at `public/styles.css`. Don't refactor them
   into the React app; they only make sense cast to a TV from a desktop.
 - **Guitar School** — `src/tools/guitar/`, SPA routes `/guitar/`,
-  `/guitar/<course>/` and `/guitar/<course>/day/<n>/` (practice happens on a
+  `/guitar/<course>/`, `/guitar/<course>/day/<n>/`, and the Mode Library at
+  `/guitar/modes/` and `/guitar/modes/<mode>/` (practice happens on a
   phone next to the guitar, so it lives in the PWA, not under `/music/`).
 
 Commands: `npm run dev`, `npm test` (vitest), `npm run build` (runs `tsc
@@ -292,3 +293,32 @@ file in `courses/` plus one line in `registry.ts`, plus its paths in
 - A take: calibrate once (8 muted plucks → `latencyMs`), then count-in +
   take, onsets shifted by capture start − latency, analysed and recorded as
   an attempt. Self-assessment is the fallback without a mic.
+
+### Mode Library (`src/tools/guitar/modes/`)
+
+A reference, not a course: no days, no progress. Every mode is written from
+**A** (so the differences are audible and everything relates to the fret-5
+pentatonic box), each with a two-bar looper vamp and six original two-bar
+riffs: two `bridge` (from the pentatonic), two `lead`, one `finger`, one
+`genre`. Riffs are written for the page; never transcribe existing songs.
+
+- `theory.ts` (pure): `MODE_INTERVALS`, `characteristic()` (the notes that
+  make the sound), `formula`, `noteName` (one letter per degree),
+  `pentatonicDiff` (minor pentatonic if the mode has a ♭3, else major) and
+  `fretboardMap` for `FretMap.tsx`.
+- `riff.ts`: the one-line-per-bar notation (`0.5:3/6~h`, `0:2/7^0.5>`,
+  `0:5/0p+1/3a`, `*` for an off-scale passing note; documented at the top of
+  the file) → `Pattern`. It sets `Note.mark` (`root` / `char` / `pass`),
+  which `TabView` draws as a highlight. `TabEvent.bend` is in **whole steps**
+  (0.5 = half step); a bent note is marked by where it lands.
+- `chords.ts`: looper chord shapes and `vampPattern` (one chord a bar, or two
+  for two beats each). `data.ts`: `MODES` in suggested learning order, with
+  the prose and the riffs.
+- `data.test.ts` is the safety net for hand-written tab: every riff note is
+  in its mode (unless flagged `*`), every riff contains all of its mode's
+  characteristic notes and the root, every vamp chord tone is in the mode and
+  the vamp itself contains the characteristic notes, riffs are whole cycles
+  of the vamp, and `postbuild.mjs` lists every mode id.
+- Shared pieces it extends: `TabView` takes `fingers={false}` for lead tab
+  (no p-i-m-a row); `Transport` / `PatternPlayer` take a `backing` pattern
+  (the vamp, played quietly under the riff, toggled by "Backing chords").

@@ -15,6 +15,8 @@ export interface Note {
   finger: Finger;
   /** Palm-muted (thumb notes on day 6). */
   mute?: boolean;
+  /** Mode Library: the root, a characteristic note of the mode, or an off-scale passing note. */
+  mark?: "root" | "char" | "pass";
 }
 
 export type EventKind = "pick" | "strum" | "chunk";
@@ -29,8 +31,10 @@ export interface TabEvent {
   dir?: "down" | "up";
   finger?: Finger;
   accent?: boolean;
-  /** Hammer-on or pull-off: sounded by the fretting hand, not picked. */
-  slur?: "h" | "p";
+  /** Hammer-on, pull-off or slide: sounded by the fretting hand, not picked. */
+  slur?: "h" | "p" | "s";
+  /** String bend, in whole steps above the fretted note (0.5 = half step, 1 = whole step). */
+  bend?: number;
   /** Chord this event belongs to, when a bar holds two chords. */
   chord?: string;
 }

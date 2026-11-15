@@ -10,6 +10,8 @@ import { click, playEvent } from "./synth";
 
 export interface TransportOptions {
   pattern: Pattern;
+  /** A second pattern (the looper vamp) played quietly underneath, looping on its own length. */
+  backing?: Pattern;
   bpmForBar: (bar: number) => number;
   /** Bars after the count-in; omit to loop until stop(). */
   bars?: number;
@@ -29,6 +31,7 @@ export class Transport {
   private timeouts: number[] = [];
   private nodes: AudioScheduledSourceNode[] = [];
   private out: GainNode;
+  private back: GainNode;
   private stopped = false;
 
   constructor(
@@ -42,6 +45,9 @@ export class Transport {
     this.t0 = start + count * barSec(o.pattern, o.bpmForBar(0));
     this.out = ctx.createGain();
     this.out.connect(ctx.destination);
+    this.back = ctx.createGain();
+    this.back.gain.value = 0.55;
+    this.back.connect(this.out);
     this.tick();
     this.timer = window.setInterval(() => this.tick(), 25);
   }
@@ -66,6 +72,7 @@ export class Transport {
       const clickOn = o.click === "on" || (o.click === "countin" && bar < 0);
       if (clickOn) for (const c of clicksForBar(o.pattern, start, bpm)) click(ctx, this.out, c.t, c.accent, sink);
       if (bar >= 0) {
+        if (o.backing) for (const s of eventsForBar(o.backing, bar, start, bpm)) playEvent(ctx, this.back, s.ev, s.t, sink);
         for (const s of eventsForBar(o.pattern, bar, start, bpm)) {
           if (o.sound) playEvent(ctx, this.out, s.ev, s.t, sink);
           if (o.onEvent) this.at(s.t, () => o.onEvent!(bar, s.idx));

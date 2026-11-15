@@ -13,6 +13,7 @@ export type Pos = { bar: number; idx: number } | null;
  */
 export function PatternPlayer({
   pattern,
+  backing,
   start,
   target,
   best,
@@ -20,6 +21,8 @@ export function PatternPlayer({
   onPos,
 }: {
   pattern: Pattern;
+  /** The mode vamp, offered as a backing under the riff. */
+  backing?: Pattern;
   start: number;
   target: number;
   best?: number;
@@ -30,6 +33,7 @@ export function PatternPlayer({
   const [sound, setSound] = useState(true);
   const [clickOn, setClickOn] = useState(true);
   const [trainer, setTrainer] = useState(false);
+  const [backOn, setBackOn] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [live, setLive] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
@@ -54,6 +58,7 @@ export function PatternPlayer({
     const top = Math.max(target, bpm);
     tr.current = new Transport(audio(), {
       pattern,
+      ...(backing && backOn ? { backing } : {}),
       bpmForBar: (b) => (trainer ? trainerBpm(b, { start: bpm, step: 4, every: 4, max: top }) : bpm),
       countIn: pattern.beats < 3 ? 2 : 1,
       click: clickOn ? "on" : "countin",
@@ -77,7 +82,7 @@ export function PatternPlayer({
       stop();
       play();
     }
-  }, [sound, clickOn, trainer]);
+  }, [sound, clickOn, trainer, backOn]);
   const toggle = (set: (f: (v: boolean) => boolean) => void) => () => {
     restart.current = true;
     set((v) => !v);
@@ -102,7 +107,7 @@ export function PatternPlayer({
           </button>
         </div>
         <span className="note bpm-hint">
-          Start {start} → target {target}
+          {start === target ? `Written at ${start}` : `Start ${start} → target ${target}`}
           {pattern.beats === 2 ? " (click = dotted quarter)" : ""}
         </span>
       </div>
@@ -110,6 +115,11 @@ export function PatternPlayer({
         <label>
           <input type="checkbox" checked={sound} onChange={toggle(setSound)} /> Hear the tab
         </label>
+        {backing && (
+          <label>
+            <input type="checkbox" checked={backOn} onChange={toggle(setBackOn)} /> Backing chords
+          </label>
+        )}
         <label>
           <input type="checkbox" checked={clickOn} onChange={toggle(setClickOn)} /> Click
         </label>

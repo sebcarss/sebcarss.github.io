@@ -23,6 +23,9 @@ const routes = [
   // One per course, plus its days (src/tools/guitar/registry.ts).
   "guitar/fingerpicking",
   ...[1, 2, 3, 4, 5, 6, 7].map((n) => `guitar/fingerpicking/day/${n}`),
+  // The Mode Library (src/tools/guitar/modes/data.ts; a test keeps these in step).
+  "guitar/modes",
+  ...["mixolydian", "dorian", "aeolian", "ionian", "lydian", "phrygian", "locrian"].map((m) => `guitar/modes/${m}`),
 ];
 
 for (const route of routes) {

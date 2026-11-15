@@ -25,6 +25,13 @@ export function Guitar() {
             </Link>
           );
         })}
+        <Link className="card" to="/guitar/modes/">
+          <h3>
+            <span aria-hidden="true">🎼</span> Mode Library
+          </h3>
+          <p>Riffs that bring out the sound of each mode, with the chords to record on a looper underneath them.</p>
+          <p className="note">7 modes from A · no schedule, dip in anywhere</p>
+        </Link>
       </div>
     </ToolPage>
   );

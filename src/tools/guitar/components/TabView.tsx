@@ -30,13 +30,18 @@ function countLabel(p: Pattern, col: number) {
   return p.subdiv === 2 ? "&" : "·";
 }
 
-function BarSvg({ p, bar, n, active }: { p: Pattern; bar: Bar; n: number; active: number | null }) {
+const bendLabel = (b: number) => (b === 0.5 ? "b½" : `b${b}`);
+
+function BarSvg({ p, bar, n, active, fingers }: { p: Pattern; bar: Bar; n: number; active: number | null; fingers: boolean }) {
   const cols = p.beats * p.subdiv;
   const W = PAD * 2 + cols * COL;
   const x = (at: number) => PAD + (at * p.subdiv + 0.5) * COL;
   const muted = bar.events.some((e) => e.notes.some((q) => q.mute));
+  // Lead tab has no picking-hand row, so the count moves up into its place.
+  const countY = fingers ? COUNT : FING;
+  const height = fingers ? H : H - (COUNT - FING);
   return (
-    <svg className="tab-bar" viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Bar ${n}${bar.chord ? `, ${bar.chord}` : ""}`}>
+    <svg className="tab-bar" viewBox={`0 0 ${W} ${height}`} width={W} height={height} role="img" aria-label={`Bar ${n}${bar.chord ? `, ${bar.chord}` : ""}`}>
       <text className="tab-chord" x={PAD} y={12}>
         {bar.chord ?? ""}
       </text>
@@ -45,7 +50,7 @@ function BarSvg({ p, bar, n, active }: { p: Pattern; bar: Bar; n: number; active
         {muted ? " · PM" : ""}
       </text>
       {bar.events.map((e, i) =>
-        active === i ? <rect key={`h${i}`} className="tab-active" x={x(e.at) - COL / 2 + 1} y={TOP - 9} width={COL - 2} height={COUNT - TOP + 12} rx={4} /> : null,
+        active === i ? <rect key={`h${i}`} className="tab-active" x={x(e.at) - COL / 2 + 1} y={TOP - 9} width={COL - 2} height={countY - TOP + 12} rx={4} /> : null,
       )}
       {[1, 2, 3, 4, 5, 6].map((s) => (
         <line key={s} className="tab-line" x1={PAD / 2} x2={W - PAD / 2} y1={y(s)} y2={y(s)} />
@@ -71,8 +76,8 @@ function BarSvg({ p, bar, n, active }: { p: Pattern; bar: Bar; n: number; active
             )}
             {e.notes.map((q) => (
               <g key={q.s}>
-                <rect className="tab-bg" x={cx - 7} y={y(q.s) - 6} width={14} height={12} rx={2} />
-                <text className={`tab-fret f-${q.finger}${q.mute ? " mute" : ""}${strum ? " small" : ""}`} x={cx} y={y(q.s) + 4} textAnchor="middle">
+                <rect className={"tab-bg" + (q.mark ? ` mark-${q.mark}` : "")} x={cx - 7} y={y(q.s) - 6} width={14} height={12} rx={2} />
+                <text className={`tab-fret ${fingers ? `f-${q.finger}` : "plain"}${q.mute ? " mute" : ""}${strum ? " small" : ""}`} x={cx} y={y(q.s) + 4} textAnchor="middle">
                   {q.f}
                 </text>
               </g>
@@ -87,10 +92,15 @@ function BarSvg({ p, bar, n, active }: { p: Pattern; bar: Bar; n: number; active
                 {e.slur}
               </text>
             )}
+            {e.bend != null && (
+              <text className="tab-slur tab-bend" x={cx + 8} y={y(Math.min(...ss)) - 6}>
+                {bendLabel(e.bend)}
+              </text>
+            )}
           </g>
         );
       })}
-      {bar.events.map((e, i) => {
+      {fingers && bar.events.map((e, i) => {
         const f = fingersOf(e);
         const arrow = e.kind === "strum" ? (e.dir === "up" ? "↑" : "↓") : "";
         return (
@@ -109,7 +119,7 @@ function BarSvg({ p, bar, n, active }: { p: Pattern; bar: Bar; n: number; active
         );
       })}
       {Array.from({ length: cols }, (_, c) => (
-        <text key={`c${c}`} className={"tab-count" + (c % p.subdiv === 0 ? " on" : "")} x={PAD + (c + 0.5) * COL} y={COUNT} textAnchor="middle">
+        <text key={`c${c}`} className={"tab-count" + (c % p.subdiv === 0 ? " on" : "")} x={PAD + (c + 0.5) * COL} y={countY} textAnchor="middle">
           {countLabel(p, c)}
         </text>
       ))}
@@ -117,13 +127,13 @@ function BarSvg({ p, bar, n, active }: { p: Pattern; bar: Bar; n: number; active
   );
 }
 
-export function TabView({ pattern, active }: { pattern: Pattern; active?: { bar: number; idx: number } | null }) {
+export function TabView({ pattern, active, fingers = true }: { pattern: Pattern; active?: { bar: number; idx: number } | null; fingers?: boolean }) {
   const len = pattern.bars.length;
   const activeBar = active ? ((active.bar % len) + len) % len : -1;
   return (
     <div className="tab" aria-label={`Tab: ${pattern.name}`}>
       {pattern.bars.map((b, i) => (
-        <BarSvg key={i} p={pattern} bar={b} n={i + 1} active={i === activeBar ? active!.idx : null} />
+        <BarSvg key={i} p={pattern} bar={b} n={i + 1} active={i === activeBar ? active!.idx : null} fingers={fingers} />
       ))}
     </div>
   );
@@ -133,6 +143,14 @@ export function FingerKey() {
   return (
     <p className="finger-key note">
       <span className="f-p">p</span> thumb · <span className="f-i">i</span> index · <span className="f-m">m</span> middle · <span className="f-a">a</span> ring · ↓↑ strum · ✕ chunk · &gt; accent · h hammer-on
+    </p>
+  );
+}
+
+export function LeadKey() {
+  return (
+    <p className="finger-key note">
+      <span className="key-swatch mark-char" /> the mode's own note · <span className="key-swatch mark-root" /> root · h hammer-on · p pull-off · s slide · b½ b1 bend · &gt; accent
     </p>
   );
 }

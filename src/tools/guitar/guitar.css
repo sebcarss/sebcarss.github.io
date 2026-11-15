@@ -173,3 +173,43 @@
   .timer-left { font-size: 1.15rem; }
   .bench td:not(:first-child) { white-space: normal; }
 }
+
+/* ---- Mode Library ---- */
+:root { --mode-char: var(--f-a); }
+.tab-fret.plain { fill: var(--text); }
+.tab-bg.mark-char { fill: color-mix(in srgb, var(--mode-char) 24%, var(--surface)); stroke: var(--mode-char); stroke-width: 1; }
+.tab-bg.mark-root { stroke: var(--muted); stroke-width: 1; }
+.tab-bend { font-size: 9.5px; }
+.key-swatch { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; vertical-align: -0.05em; border: 1px solid var(--muted); }
+.key-swatch.mark-char { background: color-mix(in srgb, var(--mode-char) 24%, var(--surface)); border-color: var(--mode-char); }
+
+.mode-formula { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0 0.75rem; padding: 0; list-style: none; }
+.mode-formula li { min-width: 2.6rem; padding: 0.3rem 0.4rem; border: 1px solid var(--border); border-radius: 8px; text-align: center; background: var(--surface-2); }
+.mode-formula li.char { border-color: var(--mode-char); background: color-mix(in srgb, var(--mode-char) 16%, var(--surface)); }
+.mode-formula strong { display: block; font-size: 1rem; }
+.mode-formula span { font-size: 0.8rem; color: var(--muted); }
+.card .mode-degrees { font-family: var(--mono); font-size: 0.85rem; color: var(--text); margin-top: 0.4rem; }
+
+.fretmap { display: block; max-width: 100%; height: auto; margin: 0.5rem 0; }
+.fretmap .fm-string, .fretmap .fm-fret { stroke: var(--tab-line); stroke-width: 1; }
+.fretmap .fm-no { font-size: 10px; fill: var(--muted); }
+.fretmap .fm-dot { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1; }
+.fretmap .fm-dot.root { fill: var(--accent); stroke: var(--accent); }
+.fretmap .fm-dot.added { fill: color-mix(in srgb, var(--mode-char) 24%, var(--surface)); stroke: var(--mode-char); stroke-width: 1.5; }
+.fretmap .fm-label { font-size: 9.5px; font-weight: 700; fill: var(--text); }
+.fretmap .fm-label.root { fill: #fff; }
+.map-key { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0; }
+.map-key .dot { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 50%; border: 1px solid var(--muted); background: var(--surface-2); vertical-align: -0.05em; }
+.map-key .dot.root { background: var(--accent); border-color: var(--accent); }
+.map-key .dot.added { background: color-mix(in srgb, var(--mode-char) 24%, var(--surface)); border-color: var(--mode-char); }
+
+.chord-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0; }
+.chordbox { display: block; }
+.chordbox .cb-name { font-size: 13px; font-weight: 700; fill: var(--text); }
+.chordbox .cb-line { stroke: var(--tab-line); stroke-width: 1; }
+.chordbox .cb-nut { stroke: var(--text); stroke-width: 3; }
+.chordbox .cb-dot { fill: var(--text); }
+.chordbox .cb-open { fill: none; stroke: var(--text); stroke-width: 1.2; }
+.chordbox .cb-x { font-size: 10px; fill: var(--muted); }
+.riff-filter { margin: 0.25rem 0 0; }
+.riff-kind { margin-left: 0.5rem; vertical-align: 0.15em; }

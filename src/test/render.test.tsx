@@ -14,6 +14,8 @@ import { Guitar } from "@/tools/guitar/pages/Guitar";
 import { Course } from "@/tools/guitar/pages/Course";
 import { Day } from "@/tools/guitar/pages/Day";
 import { PROGRESS_KEY } from "@/tools/guitar/useProgress";
+import { ModeList } from "@/tools/guitar/modes/ModeList";
+import { ModePage } from "@/tools/guitar/modes/ModePage";
 
 // Fixed books so the smoke test doesn't depend on the real data files.
 vi.mock("@/tools/cookbooks/data", async (importActual) => {
@@ -339,5 +341,41 @@ describe("pages render", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByRole("heading", { name: /^Day 9/ })).toBeNull();
+  });
+  it("guitar: the mode library lists seven modes and a mode shows its vamp, neck map and riffs", () => {
+    at("/guitar", <Guitar />);
+    expect(screen.getByText("Mode Library").closest("a")!.getAttribute("href")).toBe("/guitar/modes/");
+    cleanup();
+    at("/guitar/modes", <ModeList />);
+    expect(screen.getAllByRole("link", { name: /^\d A / })).toHaveLength(7);
+    expect(screen.getByRole("link", { name: /A Mixolydian/ }).getAttribute("href")).toBe("/guitar/modes/mixolydian/");
+    cleanup();
+
+    const modeAt = (id: string) =>
+      render(
+        <MemoryRouter initialEntries={[`/guitar/modes/${id}`]}>
+          <Routes>
+            <Route path="/guitar/modes/:mode" element={<ModePage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    modeAt("mixolydian");
+    expect(screen.getByRole("heading", { name: /A Mixolydian/ })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "A chord: x 0 2 2 2 0" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /A Mixolydian on the neck/ })).toBeTruthy();
+    expect(screen.getByText(/A major pentatonic plus D \(4\), G \(♭7\)/)).toBeTruthy();
+    // The vamp plus six riffs, each with a player.
+    expect(screen.getAllByRole("button", { name: "▶ Play" })).toHaveLength(7);
+    expect(screen.getAllByLabelText("Backing chords")).toHaveLength(6);
+    expect(screen.getByRole("heading", { name: /Country-rock double stops/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Fingerpicked" }));
+    expect(screen.getAllByRole("button", { name: "▶ Play" })).toHaveLength(2);
+    expect(screen.queryByRole("heading", { name: /Country-rock double stops/ })).toBeNull();
+    expect(screen.getByRole("heading", { name: /Open A with a seventh on top/ })).toBeTruthy();
+    cleanup();
+
+    modeAt("blues");
+    expect(screen.queryByText("Looper vamp")).toBeNull();
   });
 });

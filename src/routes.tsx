@@ -12,6 +12,8 @@ import { FlavourDetail } from "@/tools/flavours/FlavourDetail";
 import { Guitar } from "@/tools/guitar/pages/Guitar";
 import { Course } from "@/tools/guitar/pages/Course";
 import { Day } from "@/tools/guitar/pages/Day";
+import { ModeList } from "@/tools/guitar/modes/ModeList";
+import { ModePage } from "@/tools/guitar/modes/ModePage";
 
 // Keep the route list in sync with scripts/postbuild.mjs.
 export const router = createBrowserRouter([
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
       { path: "/food/flavour-library", element: <Flavours /> },
       { path: "/food/flavour-library/:id", element: <FlavourDetail /> },
       { path: "/guitar", element: <Guitar /> },
+      { path: "/guitar/modes", element: <ModeList /> },
+      { path: "/guitar/modes/:mode", element: <ModePage /> },
       { path: "/guitar/:course", element: <Course /> },
       { path: "/guitar/:course/day/:n", element: <Day /> },
       { path: "*", element: <NotFound /> },
