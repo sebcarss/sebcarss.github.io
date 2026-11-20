@@ -9,6 +9,8 @@ import { Ramen } from "@/tools/ramen/Ramen";
 import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
 import { Flavours } from "@/tools/flavours/Flavours";
 import { FlavourDetail } from "@/tools/flavours/FlavourDetail";
+import { RecipeNotes } from "@/tools/recipe-notes/RecipeNotes";
+import { RecipeNoteDetail } from "@/tools/recipe-notes/RecipeNoteDetail";
 import { Guitar } from "@/tools/guitar/pages/Guitar";
 import { Course } from "@/tools/guitar/pages/Course";
 import { Day } from "@/tools/guitar/pages/Day";
@@ -28,6 +30,8 @@ export const router = createBrowserRouter([
       { path: "/food/cookbooks", element: <Cookbooks /> },
       { path: "/food/flavour-library", element: <Flavours /> },
       { path: "/food/flavour-library/:id", element: <FlavourDetail /> },
+      { path: "/food/recipe-notes", element: <RecipeNotes /> },
+      { path: "/food/recipe-notes/:id", element: <RecipeNoteDetail /> },
       { path: "/guitar", element: <Guitar /> },
       { path: "/guitar/modes", element: <ModeList /> },
       { path: "/guitar/modes/:mode", element: <ModePage /> },

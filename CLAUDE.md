@@ -10,7 +10,7 @@ Seb Carss's personal homepage at sebcarss.github.io. Two halves:
   `src/`, installable as a PWA (`vite-plugin-pwa`) so it works offline on a
   phone. Routes: `/`, `/food/`, `/food/ice-cream-calculator/`,
   `/food/bakers-percentage/`, `/food/ramen-noodles/`, `/food/cookbooks/`,
-  `/food/flavour-library/`.
+  `/food/flavour-library/`, `/food/recipe-notes/` (+ `/<id>`).
 - **Music tools** — `public/music/**` (Tab Caster, Scale Charts). Plain,
   self-contained static HTML that the build copies through unchanged. They
   link `/styles.css`, which lives at `public/styles.css`. Don't refactor them
@@ -258,6 +258,29 @@ some greens" → rubs, marinades and sauces that go with it.
   tab). Its back link does `navigate(-1)` when you came from the list, so
   the search is kept, and `<ScrollRestoration>` in `Layout` restores the
   scroll. `postbuild.mjs` writes a page per id from `flavours.json`.
+
+## Recipe Notes (`src/tools/recipe-notes/`)
+
+Brief notes on dishes cooked at home (what went in, how it was cooked), not
+full recipes. A search page like the Flavour Library (no `compute`,
+`useDraft` or `RecipeBar`); state is the URL: `q` and repeated `tag`.
+
+- `notes.json`: `{ id, title, added, tags, about?, ingredients[], method[] }`,
+  newest first. Tags are lowercase-kebab-case. `NoteSchema` in `data.ts`
+  validates leniently; `data.test.ts` fails CI on a bad entry, duplicate id or
+  bad tag.
+- `engine.ts` `searchNotes({ text, tags }, NOTES)`: tags are AND; every typed
+  word must match somewhere (title 5, tags 3, ingredients 2, about/method 1),
+  reusing the Cookbook Finder's `normalize`/`singular`/`wordMatch`. No text
+  lists everything, newest first.
+- Each note has a page at `/food/recipe-notes/<id>` (`RecipeNoteDetail.tsx`;
+  back link as in the Flavour Library). `postbuild.mjs` writes a page per id.
+- Add notes with `npm run add-note` (prompts, or `-- --file note.json` for a
+  note or array of notes; `--no-git` only edits the file). It commits and
+  pushes `notes.json` only. Pure logic is in `scripts/lib/notes.mjs`
+  (`buildNote`, `serializeNotes`, which must keep the file's format), tested
+  in `notes.test.ts`. When Seb pastes a dish, trim it to short ingredient and
+  step lines, pick tags, write a `--file` JSON to the scratchpad and run it.
 
 ## Guitar School (`src/tools/guitar/`)
 

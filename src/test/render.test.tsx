@@ -10,6 +10,8 @@ import { Ramen } from "@/tools/ramen/Ramen";
 import { Cookbooks } from "@/tools/cookbooks/Cookbooks";
 import { Flavours } from "@/tools/flavours/Flavours";
 import { FlavourDetail } from "@/tools/flavours/FlavourDetail";
+import { RecipeNotes } from "@/tools/recipe-notes/RecipeNotes";
+import { RecipeNoteDetail } from "@/tools/recipe-notes/RecipeNoteDetail";
 import { Guitar } from "@/tools/guitar/pages/Guitar";
 import { Course } from "@/tools/guitar/pages/Course";
 import { Day } from "@/tools/guitar/pages/Day";
@@ -264,6 +266,36 @@ describe("pages render", () => {
     cleanup();
     flavourAt("/food/flavour-library/nope");
     expect(screen.getByText(/isn't in the library/)).toBeTruthy();
+  });
+
+  it("recipe notes: search and tags filter, a note opens, and back keeps the search", () => {
+    render(
+      <MemoryRouter initialEntries={["/food/recipe-notes"]}>
+        <Routes>
+          <Route path="/food/recipe-notes" element={<RecipeNotes />} />
+          <Route path="/food/recipe-notes/:id" element={<RecipeNoteDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Chicken & Squash Saagwala")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search notes"), { target: { value: "xyzzy" } });
+    expect(screen.getByText(/Nothing matches/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search notes"), { target: { value: "squash" } });
+    fireEvent.click(within(screen.getByRole("group", { name: "Tags" })).getByRole("button", { name: /^curry/ }));
+    fireEvent.click(screen.getByText("Chicken & Squash Saagwala"));
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Chicken & Squash Saagwala");
+    expect(screen.getByText(/Blanch the spinach/)).toBeTruthy();
+    fireEvent.click(screen.getByText(/‹ Recipe Notes/));
+    expect((screen.getByLabelText("Search notes") as HTMLInputElement).value).toBe("squash");
+    cleanup();
+    render(
+      <MemoryRouter initialEntries={["/food/recipe-notes/nope"]}>
+        <Routes>
+          <Route path="/food/recipe-notes/:id" element={<RecipeNoteDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/no note with that name/)).toBeTruthy();
   });
 
   it("guitar: the hub lists the finger picking course and the course shows its plan and tests", () => {

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "chicken-and-squash-saagwala",
+    "title": "Chicken & Squash Saagwala",
+    "added": "2026-11-20",
+    "tags": ["curry", "indian", "punjabi", "chicken", "squash", "spinach", "weeknight"],
+    "about": "Punjabi-style saag curry: spinach as the star, with sweet roasted squash against the earthy greens.",
+    "ingredients": [
+      "Chicken breast, diced",
+      "Crown Prince squash, chunks",
+      "Spinach, a lot of it",
+      "Red onion, diced",
+      "Garlic, ginger, green chillies",
+      "Chopped tomatoes",
+      "Vegetable bouillon, a small amount, and boiling water (for poaching the chicken)",
+      "Cumin seeds and dried red chillies, whole",
+      "Ground coriander, cumin and turmeric",
+      "Oil and salt"
+    ],
+    "method": [
+      "Temper cumin seeds and dried red chillies in oil.",
+      "Sauté red onion, garlic, ginger and green chillies. Add ground coriander, cumin, turmeric and tomatoes; cook down to a thick, jammy masala.",
+      "Meanwhile roast the squash with oil and salt at 210°C (190°C fan) for 20–25 minutes, until the edges caramelise.",
+      "Blanch the spinach for 60 seconds, plunge into ice water to keep it bright green, then blend to a coarse purée.",
+      "Stir the purée into the masala, dissolve a small amount of vegetable bouillon in boiling water and add just enough to let the chicken poach, then add the chicken and poach for 8 minutes.",
+      "Fold in both the roasted squash and the puréed spinach at the very end so the squash stays intact."
+    ]
+  }
+]

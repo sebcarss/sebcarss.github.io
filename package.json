@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "add-recipes": "node scripts/add-recipes.mjs",
+    "add-note": "node scripts/add-note.mjs",
     "import-book": "node scripts/import-book.mjs"
   },
   "dependencies": {

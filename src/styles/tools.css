@@ -254,3 +254,17 @@ textarea { width: 100%; min-height: 4.5rem; resize: vertical; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }
 .flavours .about { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Recipe Notes */
+.chip .count { color: var(--muted); font-size: 0.8em; }
+.chip[aria-pressed="true"] .count { color: inherit; opacity: 0.8; }
+a.chip { text-decoration: none; display: inline-flex; align-items: center; }
+.linklike { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+.recipe-notes li.recipe-note { padding: 0; }
+.recipe-notes a.row { align-items: center; padding: 0.55rem 0.4rem; }
+.recipe-notes a.row .text { display: flex; flex-direction: column; gap: 0.1rem; }
+.recipe-note .name { font-weight: 600; }
+.recipe-note .about { margin: 0.15rem 0; }
+.recipe-note .note { margin: 0; }
+.note-lines { margin: 0; padding-left: 1.3rem; line-height: 1.55; }
+.note-lines li + li { margin-top: 0.4rem; }
