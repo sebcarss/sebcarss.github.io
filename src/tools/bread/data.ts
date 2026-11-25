@@ -12,6 +12,7 @@ export const HYDRATION_TICKS = [50, ...HYDRATION_BANDS.map((b) => b.to)];
 export const SALT_TARGET: Range = [1.8, 2.2];
 export const SALT_SCALE: Range = [0, 4];
 export const PROTEIN_SCALE: Range = [7, 16];
+export const PROTEIN_TARGET: Range = [11.5, 13.5];
 
 export const PREF_TYPES = ["none", "poolish", "biga", "levain", "pate", "sponge"] as const;
 export type PrefType = (typeof PREF_TYPES)[number];
@@ -25,6 +26,8 @@ export interface PrefDef {
   /** Yeast % of preferment flour; null = no commercial yeast; "recipe" = a piece of the dough. */
   yeastPct: number | null | "recipe";
   salted: boolean;
+  /** One-line method for the recipe view. */
+  step: string;
 }
 
 export const PREFERMENTS: Record<Exclude<PrefType, "none">, PrefDef> = {
@@ -35,6 +38,7 @@ export const PREFERMENTS: Record<Exclude<PrefType, "none">, PrefDef> = {
     hydration: 100,
     yeastPct: 0.1,
     salted: false,
+    step: "Mix until no dry flour is left, cover and leave 8–16 h at room temperature until bubbly and just starting to sink.",
   },
   biga: {
     label: "Biga",
@@ -43,6 +47,7 @@ export const PREFERMENTS: Record<Exclude<PrefType, "none">, PrefDef> = {
     hydration: 50,
     yeastPct: 0.1,
     salted: false,
+    step: "Mix to a shaggy, stiff dough (no need to knead), cover and leave 12–16 h somewhere cool.",
   },
   levain: {
     label: "Levain",
@@ -51,6 +56,7 @@ export const PREFERMENTS: Record<Exclude<PrefType, "none">, PrefDef> = {
     hydration: 100,
     yeastPct: null,
     salted: false,
+    step: "Mix the starter, flour and water, cover and leave 4–12 h until doubled and domed.",
   },
   pate: {
     label: "Pâte fermentée",
@@ -59,6 +65,7 @@ export const PREFERMENTS: Record<Exclude<PrefType, "none">, PrefDef> = {
     hydration: "recipe",
     yeastPct: "recipe",
     salted: true,
+    step: "Mix like a normal dough, cover and leave 12–24 h in the fridge.",
   },
   sponge: {
     label: "Sponge",
@@ -67,8 +74,11 @@ export const PREFERMENTS: Record<Exclude<PrefType, "none">, PrefDef> = {
     hydration: 65,
     yeastPct: 1,
     salted: false,
+    step: "Mix to a loose batter, cover and leave 1–4 h until risen and bubbly.",
   },
 };
+
+export const TZ_STEP = "Whisk until smooth, then cook over a low heat, stirring, until it thickens to a paste (about 65 °C). Cover and cool before adding.";
 
 export const YEAST_GUIDE = [
   ["0.2–0.5%", "long / overnight ferments"],

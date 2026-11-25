@@ -16,6 +16,24 @@ export const PrefSchema = z.object({
 });
 export type Pref = z.infer<typeof PrefSchema>;
 
+export const TzSchema = z.object({
+  on: z.boolean(),
+  /** Tangzhong flour, % of total flour (it is part of the 100 %). */
+  flourPct: z.number().min(0),
+  /** Liquids cooked with it, each a % of total flour. */
+  liquids: z.array(z.object({ ing: z.string(), pct: z.number().min(0) })),
+});
+export type Tz = z.infer<typeof TzSchema>;
+
+export const DEFAULT_TZ: Tz = {
+  on: false,
+  flourPct: 4,
+  liquids: [
+    { ing: "water", pct: 10 },
+    { ing: "whole-milk", pct: 10 },
+  ],
+};
+
 export const BreadStateSchema = z.object({
   mode: z.enum(["flour", "target"]),
   flourGrams: z.number().min(0),
@@ -27,6 +45,14 @@ export const BreadStateSchema = z.object({
   yeast: z.object({ ing: z.string(), pct: z.number().min(0) }),
   extras: z.array(z.object({ ing: z.string(), pct: z.number().min(0) })),
   pref: PrefSchema,
+  /**
+   * "total": water % is the target hydration and the water inside every other
+   * ingredient (tangzhong liquids, milk, egg, butter, fresh yeast) comes off
+   * the water you add. "added": water % is just the water you pour in. A
+   * recipe saved before this existed has no field and stays "added".
+   */
+  hydrationMode: z.enum(["total", "added"]).default("added"),
+  tz: TzSchema.default(DEFAULT_TZ),
 });
 export type BreadState = z.infer<typeof BreadStateSchema>;
 
@@ -43,6 +69,8 @@ export const DEFAULT_STATE: BreadState = {
   yeast: { ing: "instant-yeast", pct: 1 },
   extras: [],
   pref: DEFAULT_PREF,
+  hydrationMode: "total",
+  tz: DEFAULT_TZ,
 };
 
 export function prefFor(type: PrefType, recipeHydration: number, recipeYeastPct: number, prev: Pref): Pref {
@@ -69,6 +97,12 @@ export type Action =
   | { type: "extra-remove"; index: number }
   | { type: "pref-type"; prefType: PrefType }
   | { type: "pref"; patch: Partial<Pref> }
+  | { type: "tz"; patch: Partial<Omit<Tz, "liquids">> }
+  | { type: "tz-liquid-set"; index: number; patch: Partial<Tz["liquids"][number]> }
+  | { type: "tz-liquid-add"; ing: string }
+  | { type: "tz-liquid-remove"; index: number }
+  /** `addedPct` is the water you currently add, as a % of flour, so switching keeps the grams. */
+  | { type: "hydration-mode"; mode: BreadState["hydrationMode"]; addedPct?: number; effPct?: number }
   | { type: "replace"; state: BreadState };
 
 export function reducer(s: BreadState, a: Action): BreadState {
@@ -101,6 +135,21 @@ export function reducer(s: BreadState, a: Action): BreadState {
       return { ...s, pref: prefFor(a.prefType, s.water, s.yeast.pct, s.pref) };
     case "pref":
       return { ...s, pref: { ...s.pref, ...a.patch } };
+    case "tz":
+      return { ...s, tz: { ...s.tz, ...a.patch } };
+    case "tz-liquid-set":
+      return { ...s, tz: { ...s.tz, liquids: s.tz.liquids.map((l, i) => (i === a.index ? { ...l, ...a.patch } : l)) } };
+    case "tz-liquid-add":
+      return { ...s, tz: { ...s.tz, liquids: [...s.tz.liquids, { ing: a.ing, pct: 0 }] } };
+    case "tz-liquid-remove":
+      return { ...s, tz: { ...s.tz, liquids: s.tz.liquids.filter((_, i) => i !== a.index) } };
+    case "hydration-mode": {
+      if (a.mode === s.hydrationMode) return s;
+      // Keep the dough the same: total mode stores the effective hydration,
+      // added mode stores the water actually poured in.
+      const next = a.mode === "total" ? a.effPct : a.addedPct;
+      return { ...s, hydrationMode: a.mode, water: next != null && Number.isFinite(next) ? Math.round(next * 10) / 10 : s.water };
+    }
     case "replace":
       return a.state;
   }

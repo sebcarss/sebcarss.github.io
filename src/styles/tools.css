@@ -10,6 +10,10 @@
 @media (max-width: 760px) {
   .tool-grid { grid-template-columns: 1fr; }
 }
+/* Grid items default to min-width: auto, so a wide table or a long <select>
+   option would stretch the column past the screen and the page would scroll
+   sideways on a phone. */
+.tool-grid > * { min-width: 0; }
 
 .panel {
   border: 1px solid var(--border);
@@ -69,7 +73,7 @@ textarea { width: 100%; min-height: 4.5rem; resize: vertical; }
 }
 .rows td { padding: 0.25rem 0.5rem 0.25rem 0; vertical-align: middle; }
 .rows td:last-child, .rows th:last-child { padding-right: 0; }
-.rows select { width: 100%; max-width: 100%; }
+.rows select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; }
 .rows input[type="number"] { width: 100%; max-width: 6.5rem; }
 .rows.tight input[type="number"] { max-width: 4.6rem; }
 .rows.hint td:last-child { font-size: 0.8rem; }
@@ -268,3 +272,86 @@ a.chip { text-decoration: none; display: inline-flex; align-items: center; }
 .recipe-note .note { margin: 0; }
 .note-lines { margin: 0; padding-left: 1.3rem; line-height: 1.55; }
 .note-lines li + li { margin-top: 0.4rem; }
+
+/* ---- Baker's Percentage: view switch, sticky pills, recipe view ---- */
+.view-bar { display: flex; justify-content: flex-start; }
+.view-bar .toggle { margin-bottom: 0.5rem; }
+.pills {
+  position: sticky;
+  top: var(--nav-h, 3.2rem);
+  z-index: 5;
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -1.25rem 1rem;
+  padding: 0.5rem 1.25rem;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(8px);
+  -webkit-backdrop-filter: saturate(180%) blur(8px);
+}
+.pills::-webkit-scrollbar { display: none; }
+.pill {
+  flex: 1 0 auto;
+  display: inline-flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pill .k { color: var(--muted); font-size: 0.75rem; }
+.pill .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pill.ok { border-color: var(--ok); background: var(--ok-soft); }
+.pill.ok .v { color: var(--ok); }
+.pill.low, .pill.high, .pill.off { border-color: var(--warn); background: var(--warn-soft); }
+.pill.low .v, .pill.high .v, .pill.off .v { color: var(--warn); }
+@media (min-width: 761px) { .pill { flex: 0 0 auto; } }
+@media (max-width: 400px) {
+  .pill { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+  .pill .k { font-size: 0.7rem; }
+}
+/* Pill → guidance section, clear of the nav and the pills. */
+.guidance .anchor { scroll-margin-top: calc(var(--nav-h, 3.2rem) + 3.5rem); }
+
+.rows .sub { display: block; font-size: 0.75rem; color: var(--muted); }
+label.check { display: flex; gap: 0.45rem; align-items: center; font-weight: 500; }
+button.link { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
+button.link:hover { text-decoration: underline; }
+@media (max-width: 480px) { .protein-col { display: none; } }
+
+.recipe-view { max-width: 640px; margin: 0 auto; }
+.recipe-head h2 { margin: 0; font-size: 1.4rem; }
+.recipe-head p { margin: 0.2rem 0 1rem; color: var(--muted); }
+.recipe-view .steps { list-style: none; margin: 0; padding: 0; }
+.recipe-view .steps > li { margin: 0; }
+.recipe-view .steps > li + li { margin-top: 1rem; }
+.recipe-view .step h3 { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.5rem; font-size: 1.15rem; }
+.recipe-view .step .num {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.95rem;
+}
+.recipe-view .step .title { flex: 1; min-width: 0; }
+.recipe-view .step .step-total { color: var(--muted); font-weight: 500; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+.recipe-view .checklist { list-style: none; margin: 0; padding: 0; }
+.recipe-view .checklist li + li { border-top: 1px solid var(--border); }
+.recipe-view .checklist label { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem 0; font-size: 1.1rem; cursor: pointer; }
+.recipe-view .checklist input { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; accent-color: var(--accent); }
+.recipe-view .checklist .name { flex: 1; min-width: 0; }
+.recipe-view .checklist .g { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.recipe-view .checklist li.done .name, .recipe-view .checklist li.done .g { color: var(--muted); text-decoration: line-through; }
+.recipe-view .step .hint { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.95rem; }

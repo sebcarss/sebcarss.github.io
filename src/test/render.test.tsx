@@ -103,12 +103,27 @@ describe("pages render", () => {
     expect(JSON.parse(localStorage.getItem("sc:recipes:v1")!)).toHaveLength(1);
   });
 
-  it("bread shows the split tables when a preferment is chosen", () => {
+  it("bread: tangzhong, pills and the recipe view", () => {
     at("/food/bakers-percentage", <Bread />);
     expect(screen.getByText("865 g")).toBeTruthy();
+    const pills = screen.getByRole("group", { name: "Dough at a glance" });
+    expect(within(pills).getByText("70%")).toBeTruthy();
+    expect(within(pills).getByText("2%")).toBeTruthy();
+    // A tangzhong's liquids come off the water you add.
+    fireEvent.click(screen.getByLabelText("Add a tangzhong"));
+    expect((screen.getByLabelText("Tangzhong flour grams") as HTMLInputElement).value).toBe("20");
+    expect(screen.getByText(/so the final dough gets 256 g water/)).toBeTruthy();
+    expect(within(pills).getByText("70%")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Type"), { target: { value: "poolish" } });
-    expect(screen.getByText("Final dough")).toBeTruthy();
+    expect(screen.getByText(/See the recipe/)).toBeTruthy();
+    // Recipe view: tangzhong → poolish → final dough.
+    const viewToggle = screen.getByRole("group", { name: "View" });
+    fireEvent.click(within(viewToggle).getByText("Recipe"));
+    const titles = Array.from(document.querySelectorAll(".step .title")).map((e) => e.textContent);
+    expect(titles).toEqual(["Tangzhong", "Poolish", "Final dough"]);
     expect(screen.getByText(/All of the poolish/)).toBeTruthy();
+    expect(screen.getByText(/All of the tangzhong/)).toBeTruthy();
+    fireEvent.click(within(viewToggle).getByText("Edit"));
     fireEvent.click(screen.getByText("Target dough"));
     expect(screen.getByLabelText("Loaves")).toBeTruthy();
     expect(screen.getByText(/needs .* g flour/)).toBeTruthy();

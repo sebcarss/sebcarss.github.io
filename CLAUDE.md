@@ -102,6 +102,20 @@ hydration and salt as the dough, yeast taken from it), sponge. The preferment
 is a split of the same totals; `pref.yeastSeparate` adds its yeast on top
 instead. Flour shares are normalised by their sum with a warning when ≠ 100.
 
+`hydrationMode`: in `"total"` (the default for new recipes) water % is the
+target hydration and the water inside extras, yeast and tangzhong liquids
+comes off the water you add (clamped at 0 with a warning). `"added"` is the
+old meaning; a saved state with no field parses as `"added"`, so old recipes
+don't change. The tangzhong (`state.tz`, % of flour, entered in grams) takes
+its flour out of the 100 % and its liquids are ingredients in their own
+right. `r.final` is the final dough with or without a preferment.
+`steps.ts` `recipeSteps()` orders the recipe (tangzhong → preferment → final
+dough: liquids, preferment, tangzhong, flour, yeast, salt, fats, inclusions;
+anything ≥ 50 % fat counts as a fat) for both the Recipe view
+(`?view=recipe`, tick boxes, wake lock) and the text export. `QuickPills` is
+the sticky row under the nav (`--nav-h`, set by `Layout`); tapping one opens
+the folded Guidance at that section.
+
 ## Ramen Noodles (`src/tools/ramen/`)
 
 Port of the original model: flour blend → alkali normalised to a 90:10

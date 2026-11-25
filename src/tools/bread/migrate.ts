@@ -4,7 +4,7 @@ import type { SavedRecipe } from "@/lib/recipes/store";
 import type { LegacyResolver } from "@/lib/recipes/legacy";
 import { readJSON } from "@/lib/storage";
 import { num, uid } from "@/lib/math";
-import { DEFAULT_PREF, SCHEMA_VERSION, type BreadState } from "./state";
+import { DEFAULT_PREF, DEFAULT_TZ, SCHEMA_VERSION, type BreadState } from "./state";
 import { PREF_TYPES } from "./data";
 
 const Legacy = z.object({
@@ -124,6 +124,9 @@ export function migrateBread(resolve: LegacyResolver): { recipes: SavedRecipe<Br
           hydration: d.pref ? num(d.pref.hydration) || DEFAULT_PREF.hydration : DEFAULT_PREF.hydration,
           yeastPct: d.pref ? num(d.pref.yeastPct) : DEFAULT_PREF.yeastPct,
         },
+        // The old pages' water % was the water poured in.
+        hydrationMode: "added",
+        tz: DEFAULT_TZ,
       },
     });
   }

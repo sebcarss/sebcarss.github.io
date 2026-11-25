@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ToolPage } from "@/components/ToolPage";
 import { Panel } from "@/components/Panel";
 import { Toggle } from "@/components/Toggle";
@@ -9,44 +10,19 @@ import { CustomIngredients } from "@/components/CustomIngredients";
 import { RecipeBar } from "@/components/RecipeBar";
 import { useDraft } from "@/lib/recipes/draft";
 import { useIngredients } from "@/lib/ingredients";
-import { allocate, fmt, round } from "@/lib/math";
+import { fmt, round } from "@/lib/math";
+import { readRaw, writeRaw } from "@/lib/storage";
 import { compute, type BreadResult } from "./engine";
 import { BreadStateSchema, DEFAULT_STATE, SCHEMA_VERSION, parseState, reducer, type BreadState } from "./state";
-import { HYDRATION_BANDS, HYDRATION_SCALE, HYDRATION_TICKS, PREFERMENTS, PREF_TYPES, PROTEIN_SCALE, SALT_SCALE, SALT_TARGET, YEAST_GUIDE, hydrationVerdict, yeastVerdict, type PrefType } from "./data";
+import { HYDRATION_BANDS, HYDRATION_SCALE, HYDRATION_TICKS, PREFERMENTS, PREF_TYPES, PROTEIN_SCALE, PROTEIN_TARGET, SALT_SCALE, SALT_TARGET, YEAST_GUIDE, hydrationVerdict, yeastVerdict, type PrefType } from "./data";
+import { QuickPills, type PillKey } from "./QuickPills";
+import { RecipeView } from "./RecipeView";
 import { summary, toText } from "./text";
 
 const TOOL = "bread" as const;
 
-function SplitTable({ caption, rows }: { caption: string; rows: [string, number, number?][] }) {
-  // Round with the largest-remainder method so the printed rows add up to
-  // the printed total.
-  const body = rows.slice(0, -1);
-  const total = rows[rows.length - 1]!;
-  const dp0 = body.filter((r) => (r[2] ?? 0) === 0).map((r) => r[1]);
-  const rounded = allocate(dp0, 0);
-  let k = 0;
-  return (
-    <table>
-      <caption>{caption}</caption>
-      <tbody>
-        {body.map((r, i) => {
-          const dp = r[2] ?? 0;
-          const v = dp === 0 ? rounded[k++]! : r[1];
-          return (
-            <tr key={i}>
-              <td>{r[0]}</td>
-              <td>{fmt(v, dp)} g</td>
-            </tr>
-          );
-        })}
-        <tr className="total">
-          <td>{total[0]}</td>
-          <td>{fmt(total[1])} g</td>
-        </tr>
-      </tbody>
-    </table>
-  );
-}
+const GUIDE_KEY = "sc:bread:guidance-open";
+const TZ_LIQUIDS = ["liquid", "dairy", "egg"] as const;
 
 export function Bread() {
   const [state, dispatch] = useDraft(TOOL, reducer, DEFAULT_STATE, BreadStateSchema);
@@ -63,13 +39,61 @@ export function Bread() {
   const pctFromG = (g: number, dp: number) => round(gToPct(g), dp);
 
   const saltStatus = statusFor(round(state.salt, 1), SALT_TARGET);
+  const totalMode = state.hydrationMode === "total";
+
+  // Edit | Recipe lives in the URL so Back returns to editing.
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "recipe" ? "recipe" : "edit";
+  const setView = (v: "edit" | "recipe") => {
+    const next = new URLSearchParams(params);
+    if (v === "recipe") next.set("view", "recipe");
+    else next.delete("view");
+    setParams(next);
+    try {
+      window.scrollTo({ top: 0 });
+    } catch {
+      /* jsdom */
+    }
+  };
+
+  // Guidance is folded away unless you open it; a pill opens it at its section.
+  const [guideOpen, setGuideOpen] = useState(() => readRaw(GUIDE_KEY) === "1");
+  const [focus, setFocus] = useState<PillKey | null>(null);
+  useEffect(() => {
+    writeRaw(GUIDE_KEY, guideOpen ? "1" : "0");
+  }, [guideOpen]);
+  useEffect(() => {
+    if (!focus || view !== "edit") return;
+    document.getElementById(`guide-${focus}`)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    setFocus(null);
+  }, [focus, view, guideOpen]);
+  const pick = (k: PillKey) => {
+    if (view !== "edit") setView("edit");
+    setGuideOpen(true);
+    setFocus(k);
+  };
 
   return (
     <ToolPage
       emoji="🥖"
       title="Baker's Percentage Calculator"
-      blurb="Flour is 100% — everything else is a percentage of it. Tweak hydration, salt and yeast, scale to your loaves, and split the dough into a poolish, biga, levain, pâte fermentée or sponge."
+      blurb="Flour is 100% — everything else is a percentage of it. Tweak hydration, salt and yeast, scale to your loaves, add a tangzhong, split the dough into a poolish, biga, levain, pâte fermentée or sponge, then switch to Recipe to follow it."
     >
+      <div className="view-bar no-print">
+        <Toggle
+          label="View"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "edit", label: "Edit" },
+            { value: "recipe", label: "Recipe" },
+          ]}
+        />
+      </div>
+      <QuickPills state={state} r={r} onPick={pick} />
+      {view === "recipe" ? (
+        <RecipeView state={state} r={r} />
+      ) : (
       <div className="tool-grid">
         <div>
           <Panel title="Recipe">
@@ -111,7 +135,7 @@ export function Bread() {
                 <tr>
                   <th>Flour</th>
                   <th>Share %</th>
-                  <th>Protein</th>
+                  <th className="protein-col">Protein</th>
                   <th>Grams</th>
                   <th></th>
                 </tr>
@@ -125,7 +149,7 @@ export function Bread() {
                     <td>
                       <NumberInput value={f.share} onChange={(v) => dispatch({ type: "flour-set", index: i, patch: { share: v } })} min={0} step={5} dp={1} aria-label="Flour share percent" />
                     </td>
-                    <td className="grams">{r ? round(r.flours[i]!.protein, 1) + "%" : "–"}</td>
+                    <td className="grams protein-col">{r ? round(r.flours[i]!.protein, 1) + "%" : "–"}</td>
                     <td className="grams">{r ? fmt(r.flours[i]!.grams) + " g" : "–"}</td>
                     <td>
                       {state.flours.length > 1 && (
@@ -142,7 +166,7 @@ export function Bread() {
                   <tr className="total-row">
                     <td>Blend</td>
                     <td className="grams">{round(r.shareTotal, 1)}%</td>
-                    <td className="grams">{round(r.blendProtein, 1)}%</td>
+                    <td className="grams protein-col">{round(r.blendProtein, 1)}%</td>
                     <td className="grams">{fmt(r.flourG)} g</td>
                     <td></td>
                   </tr>
@@ -159,6 +183,15 @@ export function Bread() {
             ))}
 
             <h3>Ingredients</h3>
+            <Toggle
+              label="Water % counts"
+              value={state.hydrationMode}
+              onChange={(mode) => dispatch({ type: "hydration-mode", mode, addedPct: r?.addedHydration, effPct: r?.effHydration })}
+              options={[
+                { value: "total", label: "All liquids" },
+                { value: "added", label: "Added water only" },
+              ]}
+            />
             <table className="rows">
               <thead>
                 <tr>
@@ -170,12 +203,15 @@ export function Bread() {
               </thead>
               <tbody>
                 <tr>
-                  <td>Water</td>
+                  <td>
+                    {totalMode ? "Hydration" : "Water"}
+                    {totalMode && r && <span className="sub">add {fmt(r.waterG)} g water</span>}
+                  </td>
                   <td>
                     <NumberInput value={state.water} onChange={(v) => dispatch({ type: "set", patch: { water: v } })} min={0} step={1} dp={1} aria-label="Water percent" />
                   </td>
                   <td>
-                    <NumberInput value={r?.waterG ?? 0} mode="commit" onChange={(g) => dispatch({ type: "set", patch: { water: pctFromG(g, 1) } })} readOnly={target} min={0} step={5} dp={0} aria-label="Water grams" />
+                    <NumberInput value={r?.targetWaterG ?? 0} mode="commit" onChange={(g) => dispatch({ type: "set", patch: { water: pctFromG(g, 1) } })} readOnly={target} min={0} step={5} dp={0} aria-label="Water grams" />
                   </td>
                   <td></td>
                 </tr>
@@ -247,6 +283,11 @@ export function Bread() {
                 + Add extra (oil, milk, egg, seeds…)
               </button>
             </div>
+            {r && totalMode && r.liquidWaterG >= 0.5 && (
+              <p className="note">
+                {round(state.water, 1)}% hydration = {fmt(r.targetWaterG)} g water in total: {fmt(r.liquidWaterG)} g is already inside the other ingredients{r.tz ? " (tangzhong included)" : ""}, so you add {fmt(r.waterG)} g.
+              </p>
+            )}
             {isLevain && <p className="note">Leavening comes from the levain — the commercial yeast row is off.</p>}
             {r && target && (
               <p className="note">
@@ -254,6 +295,91 @@ export function Bread() {
               </p>
             )}
             {r && r.missing.length > 0 && <p className="warn">⚠ Unknown ingredient{r.missing.length > 1 ? "s" : ""}: {r.missing.join(", ")} — not counted.</p>}
+          </Panel>
+
+          <Panel title="Tangzhong">
+            <label className="check">
+              <input type="checkbox" checked={state.tz.on} onChange={(e) => dispatch({ type: "tz", patch: { on: e.target.checked } })} />
+              Add a tangzhong
+            </label>
+            <p className="note">
+              A little of the flour cooked with liquid into a paste. It holds extra water for a soft, moist crumb that stays fresh longer. Its flour comes out of the recipe&apos;s flour
+              {totalMode ? " and its liquids count toward the hydration, so the water you add goes down." : "."}
+            </p>
+            {state.tz.on && (
+              <>
+                <table className="rows">
+                  <thead>
+                    <tr>
+                      <th>Ingredient</th>
+                      <th>Baker&apos;s %</th>
+                      <th>Grams</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Flour <span className="sub">from the blend</span></td>
+                      <td>
+                        <NumberInput value={state.tz.flourPct} onChange={(v) => dispatch({ type: "tz", patch: { flourPct: v } })} min={0} max={100} step={0.5} dp={2} aria-label="Tangzhong flour percent" />
+                      </td>
+                      <td>
+                        <NumberInput value={r?.tz?.flourG ?? 0} mode="commit" onChange={(g) => dispatch({ type: "tz", patch: { flourPct: pctFromG(g, 2) } })} readOnly={target} min={0} step={5} dp={0} aria-label="Tangzhong flour grams" />
+                      </td>
+                      <td></td>
+                    </tr>
+                    {state.tz.liquids.map((l, i) => (
+                      <tr key={i}>
+                        <td>
+                          <IngredientPicker
+                            tool={TOOL}
+                            categories={[...TZ_LIQUIDS]}
+                            value={l.ing}
+                            onChange={(id) => dispatch({ type: "tz-liquid-set", index: i, patch: { ing: id } })}
+                            aria-label={`Tangzhong liquid ${i + 1}`}
+                            missingLabel={`${l.ing} (missing)`}
+                          />
+                        </td>
+                        <td>
+                          <NumberInput value={l.pct} onChange={(v) => dispatch({ type: "tz-liquid-set", index: i, patch: { pct: v } })} min={0} step={0.5} dp={2} aria-label="Tangzhong liquid percent" />
+                        </td>
+                        <td>
+                          <NumberInput value={r?.tz?.liquids[i]?.grams ?? 0} mode="commit" onChange={(g) => dispatch({ type: "tz-liquid-set", index: i, patch: { pct: pctFromG(g, 2) } })} readOnly={target} min={0} step={5} dp={0} aria-label="Tangzhong liquid grams" />
+                        </td>
+                        <td>
+                          <button type="button" className="remove" aria-label="Remove tangzhong liquid" onClick={() => dispatch({ type: "tz-liquid-remove", index: i })}>
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {r?.tz && (
+                    <tfoot>
+                      <tr className="total-row">
+                        <td>Tangzhong</td>
+                        <td className="grams">{round(state.tz.flourPct + state.tz.liquids.reduce((a, l) => a + l.pct, 0), 1)}%</td>
+                        <td>{fmt(r.tz.totalG)} g</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+                <div className="actions">
+                  <button type="button" className="btn" onClick={() => dispatch({ type: "tz-liquid-add", ing: "whole-milk" })}>
+                    + Add liquid
+                  </button>
+                </div>
+                {r?.tz && (
+                  <p className="note">
+                    {r.tz.liquidG > 0 && r.tz.flourG > 0 ? `Liquid to flour ${round(r.tz.liquidG / r.tz.flourG, 1)} : 1 (5 : 1 is classic). ` : ""}
+                    {totalMode
+                      ? `Its ${fmt(r.tz.waterG)} g of water is part of your ${round(state.water, 1)}% hydration, so the final dough gets ${fmt(r.final.waterG)} g water.`
+                      : `Its ${fmt(r.tz.waterG)} g of water is on top of the added water (${round(r.effHydration, 1)}% in all). Set Water % counts to All liquids to take it off automatically.`}
+                  </p>
+                )}
+              </>
+            )}
           </Panel>
 
           <Panel title="Preferment">
@@ -315,31 +441,12 @@ export function Bread() {
             )}
             <p className="note">{prefDef ? prefDef.desc : "A straight dough — all ingredients mixed in one go. Pick a preferment to split the recipe."}</p>
             {r?.pref && (
-              <div className="split">
-                <SplitTable
-                  caption={r.pref.label}
-                  rows={[
-                    ...(r.pref.seedG > 0 ? ([[`Starter (${state.pref.seedHydration}%)`, r.pref.seedG]] as [string, number][]) : []),
-                    ...r.pref.flourRows.map((f): [string, number] => [f.name, r.pref!.seedG > 0 ? f.grams - (r.pref!.seedFlourG * f.grams) / r.pref!.flourG : f.grams]),
-                    ["Water", r.pref.freshWaterG],
-                    ...(r.pref.yeastG > 0 ? ([[r.yeastName, r.pref.yeastG, 2]] as [string, number, number][]) : []),
-                    ...(r.pref.saltG > 0 ? ([["Salt", r.pref.saltG, 1]] as [string, number, number][]) : []),
-                    ["Total", r.pref.totalG],
-                  ]}
-                />
-                <SplitTable
-                  caption="Final dough"
-                  rows={[
-                    ...r.pref.finalFlourRows.map((f): [string, number] => [f.name, f.grams]),
-                    ["Water", r.pref.finalWaterG],
-                    ["Salt", r.pref.finalSaltG, 1],
-                    ...(r.pref.finalYeastG > 0 || (!isLevain && r.yeastG > 0) ? ([[r.yeastName, r.pref.finalYeastG, 2]] as [string, number, number][]) : []),
-                    ...r.extras.map((e): [string, number] => [e.name, e.grams]),
-                    [`All of the ${r.pref.label.toLowerCase()}`, r.pref.totalG],
-                    ["Total", r.pref.finalTotalG],
-                  ]}
-                />
-              </div>
+              <p className="note">
+                {r.pref.label}: {fmt(r.pref.totalG)} g, then the final dough.{" "}
+                <button type="button" className="link" onClick={() => setView("recipe")}>
+                  See the recipe →
+                </button>
+              </p>
             )}
             {r?.pref?.problems.length ? <p className="warn">⚠ {r.pref.problems.join("; ")}.</p> : null}
           </Panel>
@@ -364,14 +471,16 @@ export function Bread() {
           />
         </div>
 
-        <Panel title="Guidance">
+        <details className="panel guidance" open={guideOpen} onToggle={(e) => setGuideOpen((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary>Guidance</summary>
+          <div id="guide-hydration" className="anchor" />
           <Metric label="Hydration" value={r ? round(r.effHydration, 1) + "%" : "–"}>
             <Meter scale={HYDRATION_SCALE} bands={HYDRATION_BANDS.map((b, i) => ({ from: b.from, to: b.to, cls: i % 2 ? "alt" : "" }))} value={r?.effHydration} />
             <Scale scale={HYDRATION_SCALE} ticks={HYDRATION_TICKS} />
             {r && <p className="verdict">{hydrationVerdict(r.effHydration)}</p>}
             {r && Math.abs(r.effHydration - r.addedHydration) > 0.05 && (
               <p className="note">
-                {round(r.addedHydration, 1)}% added water + {fmt(r.extraWaterG)} g water inside the other ingredients → {round(r.effHydration, 1)}% effective.
+                {fmt(r.waterG)} g added water ({round(r.addedHydration, 1)}%) + {fmt(r.liquidWaterG)} g water inside the other ingredients → {round(r.effHydration, 1)}% {totalMode ? "in total" : "effective"}.
               </p>
             )}
             <table className="guide-table left">
@@ -388,15 +497,18 @@ export function Bread() {
             </table>
           </Metric>
 
+          <div id="guide-protein" className="anchor" />
           <Metric label="Blend protein" value={r ? round(r.blendProtein, 1) + "%" : "–"}>
-            <Meter scale={PROTEIN_SCALE} bands={[{ from: 11.5, to: 13.5, cls: "target" }]} value={r?.blendProtein} />
+            <Meter scale={PROTEIN_SCALE} bands={[{ from: PROTEIN_TARGET[0], to: PROTEIN_TARGET[1], cls: "target" }]} value={r?.blendProtein} />
             <p className="note">Lean bread wants 11.5–13.5%. Wholemeal and rye absorb more water — push hydration up a few points when they're in the blend.</p>
           </Metric>
 
+          <div id="guide-salt" className="anchor" />
           <Metric label="Salt" hint={`target ${SALT_TARGET[0]}–${SALT_TARGET[1]}%`} value={r ? round(state.salt, 1) + "%" : "–"} status={r ? saltStatus : ""}>
             <Meter scale={SALT_SCALE} bands={[{ from: SALT_TARGET[0], to: SALT_TARGET[1], cls: "target" }]} value={state.salt} status={saltStatus} />
           </Metric>
 
+          <div id="guide-yeast" className="anchor" />
           <Metric label="Yeast" hint="instant-equivalent" value={r ? (isLevain ? "levain" : round(r.yeastInstantEqPct, 2) + "%") : "–"}>
             {r && <p className="verdict">{isLevain ? "Leavened by the sourdough levain." : yeastVerdict(r.yeastInstantEqPct)}</p>}
             <table className="guide-table left">
@@ -420,8 +532,9 @@ export function Bread() {
               </p>
             )}
           </Metric>
-        </Panel>
+        </details>
       </div>
+      )}
     </ToolPage>
   );
 }

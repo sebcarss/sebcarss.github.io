@@ -5,11 +5,14 @@ import { DEFAULT_STATE, parseState, reducer, type BreadState } from "./state";
 import legacy from "./fixtures/legacy.json";
 
 const lookup = (id: string) => BUILTIN_BY_ID.get(id);
-const base = (patch: Partial<BreadState>): BreadState => ({ ...DEFAULT_STATE, ...patch });
+// The legacy fixtures were captured when water % was the water poured in.
+const base = (patch: Partial<BreadState>): BreadState => ({ ...DEFAULT_STATE, hydrationMode: "added", ...patch });
+const totalBase = (patch: Partial<BreadState>): BreadState => ({ ...DEFAULT_STATE, ...patch });
+const tzOn = (liquids: BreadState["tz"]["liquids"], flourPct = 4): BreadState["tz"] => ({ on: true, flourPct, liquids });
 
 describe("bread engine — legacy parity", () => {
   it("straight dough", () => {
-    const r = compute(DEFAULT_STATE, lookup)!;
+    const r = compute(base({}), lookup)!;
     expect(r.flourG).toBe(legacy.straight.flourG);
     expect(r.totalPct).toBe(legacy.straight.totalPct);
     expect(r.waterG).toBe(legacy.straight.waterG);
@@ -38,11 +41,11 @@ describe("bread engine — legacy parity", () => {
     expect(r.pref!.flourG).toBeCloseTo(f.pref.flourG, 6);
     expect(r.pref!.waterG).toBeCloseTo(f.pref.waterG, 6);
     expect(r.pref!.yeastG).toBeCloseTo(f.pref.yeastG, 6);
-    expect(r.pref!.finalFlourG).toBeCloseTo(f.pref.finalFlourG, 6);
-    expect(r.pref!.finalWaterG).toBeCloseTo(f.pref.finalWaterG, 6);
-    expect(r.pref!.finalYeastG).toBeCloseTo(f.pref.finalYeastG, 6);
+    expect(r.final.flourG).toBeCloseTo(f.pref.finalFlourG, 6);
+    expect(r.final.waterG).toBeCloseTo(f.pref.finalWaterG, 6);
+    expect(r.final.yeastG).toBeCloseTo(f.pref.finalYeastG, 6);
     // Preferment + final dough reconstruct the whole batch.
-    expect(r.pref!.finalTotalG).toBeCloseTo(r.totalG, 6);
+    expect(r.final.totalG).toBeCloseTo(r.totalG, 6);
     // Olive oil carries no water: effective = added.
     expect(r.effHydration).toBeCloseTo(68 + (r.yeastG * 0.05 / r.flourG) * 100, 6);
   });
@@ -60,7 +63,7 @@ describe("bread engine — legacy parity", () => {
     expect(r.yeastG).toBe(0);
     expect(r.totalPct).toBe(f.totalPct);
     expect(r.totalG).toBe(f.totalG);
-    expect(r.pref!.finalWaterG).toBe(f.pref.finalWaterG);
+    expect(r.final.waterG).toBe(f.pref.finalWaterG);
     // Honey (18 % water) and butter (~16.7 %) now count toward hydration.
     expect(r.effHydration).toBeGreaterThan(75);
     expect(r.effHydration).toBeCloseTo(75 + 5 * 0.18 + 4 * 0.167, 1);
@@ -78,8 +81,8 @@ describe("bread engine — legacy parity", () => {
     const f = legacy.biga;
     expect(r.totalG).toBeCloseTo(f.totalG, 6);
     expect(r.pref!.totalG).toBeCloseTo(f.pref.totalG, 6);
-    expect(r.pref!.finalYeastG).toBeCloseTo(f.pref.finalYeastG, 6);
-    expect(r.pref!.finalTotalG).toBeCloseTo(r.totalG, 6);
+    expect(r.final.yeastG).toBeCloseTo(f.pref.finalYeastG, 6);
+    expect(r.final.totalG).toBeCloseTo(r.totalG, 6);
   });
 });
 
@@ -105,18 +108,26 @@ describe("bread engine — fixes and new behaviour", () => {
 
   it("flags a preferment that uses more than all the flour", () => {
     const r = compute(base({ pref: { ...DEFAULT_STATE.pref, type: "poolish", flourPct: 150 } }), lookup)!;
-    expect(r.pref!.finalFlourG).toBeLessThan(0);
+    expect(r.final.flourG).toBeLessThan(0);
     expect(r.pref!.problems.some((p) => p.includes("all of the flour"))).toBe(true);
+  });
+
+  it("parseState reads a recipe saved before tangzhong / total hydration as added water, no tangzhong", () => {
+    const { hydrationMode: _h, tz: _t, ...old } = DEFAULT_STATE;
+    const s = parseState({ ...old, water: 68 }, 1)!;
+    expect(s.hydrationMode).toBe("added");
+    expect(s.tz.on).toBe(false);
+    expect(compute(s, lookup)!.waterG).toBe(340);
   });
 
   it("can count the preferment yeast separately, raising the total", () => {
     const pref = { ...DEFAULT_STATE.pref, type: "poolish" as const, flourPct: 30, hydration: 100, yeastPct: 0.1 };
     const taken = compute(base({ pref }), lookup)!;
     const onTop = compute(base({ pref: { ...pref, yeastSeparate: true } }), lookup)!;
-    expect(taken.pref!.finalYeastG).toBeCloseTo(5 - 0.15, 9);
-    expect(onTop.pref!.finalYeastG).toBe(5);
+    expect(taken.final.yeastG).toBeCloseTo(5 - 0.15, 9);
+    expect(onTop.final.yeastG).toBe(5);
     expect(onTop.totalG).toBeCloseTo(taken.totalG + 0.15, 9);
-    expect(onTop.pref!.finalTotalG).toBeCloseTo(onTop.totalG, 9);
+    expect(onTop.final.totalG).toBeCloseTo(onTop.totalG, 9);
   });
 
   it("pâte fermentée is a piece of the dough: same hydration, salted, yeast taken from the recipe", () => {
@@ -125,8 +136,8 @@ describe("bread engine — fixes and new behaviour", () => {
     expect(r.pref!.waterG).toBeCloseTo(150 * 0.7, 9);
     expect(r.pref!.saltG).toBeCloseTo(3, 9);
     expect(r.pref!.yeastG).toBeCloseTo(1.5, 9);
-    expect(r.pref!.finalSaltG).toBeCloseTo(7, 9);
-    expect(r.pref!.finalTotalG).toBeCloseTo(r.totalG, 9);
+    expect(r.final.saltG).toBeCloseTo(7, 9);
+    expect(r.final.totalG).toBeCloseTo(r.totalG, 9);
   });
 
   it("levain seed splits into flour and water inside the build", () => {
@@ -173,5 +184,98 @@ describe("bread engine — fixes and new behaviour", () => {
   it("parseState rejects an old-shape recipe", () => {
     expect(parseState({ name: "x", flours: [{ name: "White", share: 100 }] }, 1)).toBeNull();
     expect(parseState(DEFAULT_STATE, 1)).toEqual(DEFAULT_STATE);
+  });
+});
+
+describe("bread engine — total hydration and tangzhong", () => {
+  it("Seb's example: 20 g flour + 50 g water + 50 g whole milk at 500 g flour, 70 %", () => {
+    const s = totalBase({ yeast: { ing: "instant-yeast", pct: 0 }, tz: tzOn([{ ing: "water", pct: 10 }, { ing: "whole-milk", pct: 10 }]) });
+    const r = compute(s, lookup)!;
+    expect(r.tz!.flourG).toBe(20);
+    expect(r.tz!.liquids.map((l) => l.grams)).toEqual([50, 50]);
+    expect(r.tz!.waterG).toBeCloseTo(50 + 43.75, 9); // whole milk is 87.5 % water
+    expect(r.waterG).toBeCloseTo(350 - 93.75, 9);
+    expect(r.final.waterG).toBeCloseTo(256.25, 9);
+    expect(r.final.flourG).toBe(480);
+    expect(r.effHydration).toBeCloseTo(70, 9);
+    expect(r.totalG).toBeCloseTo(500 + 256.25 + 100 + 10, 9);
+    expect(r.final.totalG).toBeCloseTo(r.totalG, 9);
+  });
+
+  it("tangzhong + poolish: both come out of the flour, the poolish water out of the added water", () => {
+    const s = totalBase({
+      tz: tzOn([{ ing: "water", pct: 10 }, { ing: "whole-milk", pct: 10 }]),
+      pref: { ...DEFAULT_STATE.pref, type: "poolish", flourPct: 30, hydration: 100, yeastPct: 0.1 },
+    });
+    const r = compute(s, lookup)!;
+    expect(r.pref!.flourG).toBe(150);
+    expect(r.final.flourG).toBe(500 - 150 - 20);
+    expect(r.final.waterG).toBeCloseTo(r.waterG - 150, 9);
+    expect(r.final.totalG).toBeCloseTo(r.totalG, 9);
+    expect(r.effHydration).toBeCloseTo(70, 9);
+  });
+
+  it("total mode: milk and egg extras lower the water you add, added mode leaves it", () => {
+    const extras = [{ ing: "whole-milk", pct: 20 }, { ing: "egg-whole", pct: 10 }];
+    const t = compute(totalBase({ water: 70, extras }), lookup)!;
+    const inside = 20 * 0.875 + 10 * 0.755 + 1 * 0.05;
+    expect(t.addedHydration).toBeCloseTo(70 - inside, 6);
+    expect(t.effHydration).toBeCloseTo(70, 6);
+    const a = compute(base({ water: 70, extras }), lookup)!;
+    expect(a.addedHydration).toBe(70);
+    expect(a.effHydration).toBeCloseTo(70 + inside, 6);
+  });
+
+  it("tangzhong in added mode is on top of the water", () => {
+    const r = compute(base({ yeast: { ing: "instant-yeast", pct: 0 }, tz: tzOn([{ ing: "water", pct: 10 }]) }), lookup)!;
+    expect(r.waterG).toBe(350);
+    expect(r.effHydration).toBeCloseTo(80, 9);
+  });
+
+  it("target dough with a tangzhong still hits the loaf total", () => {
+    const s = totalBase({ mode: "target", loaves: 2, loafWeight: 800, tz: tzOn([{ ing: "water", pct: 10 }, { ing: "whole-milk", pct: 10 }]), extras: [{ ing: "butter", pct: 8 }] });
+    const r = compute(s, lookup)!;
+    expect(r.totalG).toBeCloseTo(1600, 9);
+    expect(r.final.totalG).toBeCloseTo(1600, 9);
+    expect(r.effHydration).toBeCloseTo(70, 9);
+  });
+
+  it("clamps added water at zero when the liquids already exceed the hydration", () => {
+    const r = compute(totalBase({ water: 20, extras: [{ ing: "whole-milk", pct: 40 }] }), lookup)!;
+    expect(r.waterG).toBe(0);
+    expect(r.effHydration).toBeGreaterThan(20);
+    expect(r.problems.some((p) => p.includes("no water is added"))).toBe(true);
+  });
+
+  it("flags a tangzhong that needs more flour than is left", () => {
+    const r = compute(totalBase({ tz: tzOn([{ ing: "water", pct: 10 }], 80), pref: { ...DEFAULT_STATE.pref, type: "poolish", flourPct: 30, hydration: 100, yeastPct: 0.1 } }), lookup)!;
+    expect(r.final.flourG).toBeLessThan(0);
+    expect(r.problems.some((p) => p.includes("tangzhong and preferment"))).toBe(true);
+  });
+
+  it("an off tangzhong changes nothing", () => {
+    const off = compute(totalBase({ tz: { ...tzOn([{ ing: "water", pct: 10 }]), on: false } }), lookup)!;
+    expect(off.tz).toBeNull();
+    expect(off.final.flourG).toBe(500);
+  });
+
+  it("switching hydration mode keeps the water you add", () => {
+    const s = totalBase({ extras: [{ ing: "whole-milk", pct: 20 }] });
+    const r = compute(s, lookup)!;
+    const added = reducer(s, { type: "hydration-mode", mode: "added", addedPct: r.addedHydration, effPct: r.effHydration });
+    expect(added.water).toBeCloseTo(r.addedHydration, 1);
+    expect(compute(added, lookup)!.waterG).toBeCloseTo(r.waterG, 0);
+    const back = reducer(added, { type: "hydration-mode", mode: "total", addedPct: added.water, effPct: compute(added, lookup)!.effHydration });
+    expect(back.water).toBeCloseTo(70, 0);
+  });
+
+  it("tangzhong liquid reducer actions", () => {
+    let s = reducer(DEFAULT_STATE, { type: "tz", patch: { on: true } });
+    s = reducer(s, { type: "tz-liquid-add", ing: "egg-whole" });
+    expect(s.tz.liquids).toHaveLength(3);
+    s = reducer(s, { type: "tz-liquid-set", index: 2, patch: { pct: 5 } });
+    expect(s.tz.liquids[2]).toEqual({ ing: "egg-whole", pct: 5 });
+    s = reducer(s, { type: "tz-liquid-remove", index: 0 });
+    expect(s.tz.liquids.map((l) => l.ing)).toEqual(["whole-milk", "egg-whole"]);
   });
 });
